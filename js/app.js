@@ -185,7 +185,46 @@ class AuthManager {
     }
 }
 
-// Main application with REAL-TIME Firestore updates
+// البيانات الافتراضية
+const DEFAULT_SECTIONS = [
+    {
+        id: 'default-1',
+        name: 'قنوات بي إن سبورت',
+        order: 1,
+        isActive: true
+    },
+    {
+        id: 'default-2', 
+        name: 'القنوات الرياضية',
+        order: 2,
+        isActive: true
+    }
+];
+
+const DEFAULT_CHANNELS = [
+    {
+        id: 'default-1',
+        name: 'bein sport 1',
+        image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+1',
+        url: '#',
+        appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+        downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+        order: 1,
+        sectionId: 'default-1'
+    },
+    {
+        id: 'default-2',
+        name: 'bein sport 2', 
+        image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+2',
+        url: '#',
+        appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+        downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+        order: 2,
+        sectionId: 'default-1'
+    }
+];
+
+// Main application with improved data loading
 class BeinSportApp {
     constructor() {
         this.sections = [];
@@ -197,7 +236,7 @@ class BeinSportApp {
     }
 
     async init() {
-        console.log('Initializing BeinSport App...');
+        console.log('🚀 Initializing BeinSport App...');
         
         // Set current year
         document.getElementById('currentYear').textContent = new Date().getFullYear();
@@ -208,10 +247,10 @@ class BeinSportApp {
         // Wait for auth to be ready
         await this.waitForAuth();
         
-        // Load sections and channels with REAL-TIME updates
-        await this.setupRealtimeListeners();
+        // Load data
+        await this.loadData();
         
-        console.log('App initialized successfully');
+        console.log('✅ App initialized successfully');
     }
 
     async waitForAuth() {
@@ -222,14 +261,14 @@ class BeinSportApp {
             const checkAuth = () => {
                 attempts++;
                 
-                if (authManager && authManager.authReady) {
-                    console.log("Auth ready after", attempts, "attempts");
+                if (window.authManager && window.authManager.authReady) {
+                    console.log("✅ Auth ready after", attempts, "attempts");
                     resolve(true);
                     return;
                 }
                 
                 if (attempts >= maxAttempts) {
-                    console.warn("Auth not ready, continuing anyway");
+                    console.warn("⚠️ Auth not ready, continuing anyway");
                     resolve(false);
                     return;
                 }
@@ -241,156 +280,129 @@ class BeinSportApp {
         });
     }
 
-    // إعداد المستمعين للبيانات في الوقت الحقيقي
-    async setupRealtimeListeners() {
+    async loadData() {
+        console.log('📥 Loading data...');
+        
+        if (typeof db === 'undefined') {
+            console.log('❌ Firestore not available, using default data');
+            this.loadDefaultData();
+            return;
+        }
+
         try {
-            console.log('Setting up real-time Firestore listeners...');
+            // محاولة تحميل البيانات من Firestore
+            await this.loadFromFirestore();
+        } catch (error) {
+            console.error('❌ Error loading from Firestore:', error);
+            this.loadDefaultData();
+        }
+    }
+
+    async loadFromFirestore() {
+        console.log('🔥 Loading data from Firestore...');
+        
+        try {
+            // تحميل الأقسام
+            const sectionsSnapshot = await db.collection('sections')
+                .orderBy('order')
+                .get();
             
-            if (typeof db === 'undefined') {
-                console.log('Firestore not available, using default data');
-                this.loadDefaultData();
-                return;
+            if (!sectionsSnapshot.empty) {
+                this.sections = sectionsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                console.log(`✅ Loaded ${this.sections.length} sections from Firestore`);
+            } else {
+                console.log('ℹ️ No sections found in Firestore, using default');
+                this.sections = [...DEFAULT_SECTIONS];
             }
 
-            // مستمع للأقسام في الوقت الحقيقي
+            // تحميل جميع القنوات
+            const channelsSnapshot = await db.collection('channels')
+                .orderBy('order')
+                .get();
+            
+            if (!channelsSnapshot.empty) {
+                this.channels = channelsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                console.log(`✅ Loaded ${this.channels.length} channels from Firestore`);
+            } else {
+                console.log('ℹ️ No channels found in Firestore, using default');
+                this.channels = [...DEFAULT_CHANNELS];
+            }
+
+            this.renderData();
+            this.setupRealtimeListeners();
+            
+        } catch (error) {
+            console.error('❌ Firestore load error:', error);
+            throw error;
+        }
+    }
+
+    setupRealtimeListeners() {
+        console.log('👂 Setting up real-time listeners...');
+        
+        try {
+            // مستمع للأقسام
             this.sectionsUnsubscribe = db.collection('sections')
-                .where('isActive', '==', true)
                 .orderBy('order')
                 .onSnapshot((snapshot) => {
-                    console.log('Sections updated, total:', snapshot.size);
-                    
+                    console.log('🔄 Sections updated:', snapshot.size);
                     if (!snapshot.empty) {
                         this.sections = snapshot.docs.map(doc => ({
                             id: doc.id,
                             ...doc.data()
                         }));
-                        console.log('Sections loaded:', this.sections.length);
                         this.renderSections();
-                        
-                        // تحميل القنوات للقسم الأول تلقائياً
-                        if (this.sections.length > 0 && !this.currentSection) {
-                            this.showSection(this.sections[0].id);
-                        }
-                    } else {
-                        console.log('No active sections found');
-                        this.loadDefaultSections();
                     }
                 }, (error) => {
-                    console.error('Error in sections listener:', error);
-                    this.loadDefaultData();
+                    console.error('❌ Sections listener error:', error);
                 });
 
-            console.log('Real-time listeners setup completed');
-            
-        } catch (error) {
-            console.error('Error setting up real-time listeners:', error);
-            this.loadDefaultData();
-        }
-    }
-
-    // تحميل القنوات لقسم معين
-    async loadChannelsForSection(sectionId) {
-        try {
-            if (typeof db === 'undefined') {
-                console.log('Firestore not available, using default channels');
-                this.loadDefaultChannels();
-                return;
-            }
-
-            // إلغاء الاشتراك السابق إذا كان موجوداً
-            if (this.channelsUnsubscribe) {
-                this.channelsUnsubscribe();
-            }
-
-            // مستمع للقنوات في الوقت الحقيقي للقسم المحدد
+            // مستمع للقنوات
             this.channelsUnsubscribe = db.collection('channels')
-                .where('sectionId', '==', sectionId)
-                .where('isActive', '!=', false)
                 .orderBy('order')
                 .onSnapshot((snapshot) => {
-                    console.log('Channels updated for section', sectionId, 'total:', snapshot.size);
-                    
+                    console.log('🔄 Channels updated:', snapshot.size);
                     if (!snapshot.empty) {
                         this.channels = snapshot.docs.map(doc => ({
                             id: doc.id,
                             ...doc.data()
                         }));
-                        console.log('Channels loaded:', this.channels.length);
-                        this.renderChannels();
-                    } else {
-                        console.log('No channels found for section:', sectionId);
-                        this.renderEmptyChannels();
+                        if (this.currentSection) {
+                            this.renderChannelsForSection(this.currentSection.id);
+                        }
                     }
                 }, (error) => {
-                    console.error('Error in channels listener:', error);
-                    this.loadDefaultChannels();
+                    console.error('❌ Channels listener error:', error);
                 });
 
         } catch (error) {
-            console.error('Error loading channels:', error);
-            this.loadDefaultChannels();
+            console.error('❌ Error setting up real-time listeners:', error);
         }
     }
 
     loadDefaultData() {
-        console.log('Loading default data...');
-        this.loadDefaultSections();
-        this.loadDefaultChannels();
+        console.log('📋 Loading default data...');
+        this.sections = [...DEFAULT_SECTIONS];
+        this.channels = [...DEFAULT_CHANNELS];
+        this.renderData();
     }
 
-    loadDefaultSections() {
-        console.log('Loading default sections...');
-        this.sections = [
-            {
-                id: 'default-1',
-                name: 'قنوات بي إن سبورت',
-                order: 1,
-                isActive: true
-            },
-            {
-                id: 'default-2', 
-                name: 'القنوات الرياضية',
-                order: 2,
-                isActive: true
-            }
-        ];
+    renderData() {
         this.renderSections();
-        
         if (this.sections.length > 0) {
             this.showSection(this.sections[0].id);
         }
     }
 
-    loadDefaultChannels() {
-        console.log('Loading default channels...');
-        this.channels = [
-            {
-                id: 'default-1',
-                name: 'bein sport 1',
-                image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+1',
-                url: '#',
-                appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                order: 1,
-                sectionId: 'default-1',
-                isActive: true
-            },
-            {
-                id: 'default-2',
-                name: 'bein sport 2', 
-                image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+2',
-                url: '#',
-                appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                order: 2,
-                sectionId: 'default-1',
-                isActive: true
-            }
-        ];
-        this.renderChannels();
-    }
-
     renderSections() {
+        console.log('🎨 Rendering sections:', this.sections.length);
+        
         let sectionsContainer = document.getElementById('sectionsContainer');
         if (!sectionsContainer) {
             sectionsContainer = document.createElement('div');
@@ -401,11 +413,11 @@ class BeinSportApp {
             const content = document.querySelector('.content');
             if (ticker && content) {
                 ticker.parentNode.insertBefore(sectionsContainer, content);
+            } else {
+                document.body.insertBefore(sectionsContainer, document.querySelector('.content'));
             }
         }
 
-        console.log('Rendering sections:', this.sections.length);
-        
         if (this.sections.length === 0) {
             sectionsContainer.innerHTML = '<div class="no-sections">لا توجد أقسام متاحة</div>';
             return;
@@ -426,14 +438,11 @@ class BeinSportApp {
             });
         });
 
-        // تعيين القسم الأول كنشط إذا لم يكن هناك قسم نشط
-        if (!this.currentSection && this.sections.length > 0) {
-            this.showSection(this.sections[0].id);
-        }
+        console.log('✅ Sections rendered successfully');
     }
 
-    async showSection(sectionId) {
-        console.log('Showing section:', sectionId);
+    showSection(sectionId) {
+        console.log('📂 Showing section:', sectionId);
         
         // تحديث التبويب النشط
         document.querySelectorAll('.section-tab').forEach(tab => {
@@ -447,18 +456,27 @@ class BeinSportApp {
         
         this.currentSection = this.sections.find(s => s.id === sectionId);
         
-        // تحميل القنوات للقسم المحدد
-        await this.loadChannelsForSection(sectionId);
+        // عرض القنوات للقسم المحدد
+        this.renderChannelsForSection(sectionId);
     }
 
-    renderChannels() {
+    renderChannelsForSection(sectionId) {
+        console.log('📺 Rendering channels for section:', sectionId);
+        
+        const sectionChannels = this.channels.filter(channel => channel.sectionId === sectionId);
+        console.log(`📊 Found ${sectionChannels.length} channels for section ${sectionId}`);
+        
+        this.renderChannels(sectionChannels);
+    }
+
+    renderChannels(channels = []) {
         const container = document.getElementById('channelsContainer');
         if (!container) {
-            console.error('Channels container not found');
+            console.error('❌ Channels container not found');
             return;
         }
         
-        if (!this.channels || this.channels.length === 0) {
+        if (!channels || channels.length === 0) {
             container.innerHTML = `
                 <div class="loading">
                     <i class="uil uil-tv-retro"></i>
@@ -468,9 +486,9 @@ class BeinSportApp {
             return;
         }
 
-        console.log('Rendering channels:', this.channels.length);
+        console.log('🎨 Rendering channels:', channels.length);
         
-        container.innerHTML = this.channels.map(channel => `
+        container.innerHTML = channels.map(channel => `
             <div class="channel-card" data-channel-id="${channel.id}">
                 <div class="channel-logo">
                     <img src="${channel.image}" alt="${channel.name}" 
@@ -484,42 +502,30 @@ class BeinSportApp {
         container.querySelectorAll('.channel-card').forEach(card => {
             card.addEventListener('click', () => {
                 const channelId = card.getAttribute('data-channel-id');
-                const channel = this.channels.find(c => c.id === channelId);
+                const channel = channels.find(c => c.id === channelId);
                 if (channel) {
                     this.openChannel(channel);
                 }
             });
         });
-    }
 
-    renderEmptyChannels() {
-        const container = document.getElementById('channelsContainer');
-        if (container) {
-            container.innerHTML = `
-                <div class="loading">
-                    <i class="uil uil-tv-retro"></i>
-                    <p>لا توجد قنوات متاحة في هذا القسم</p>
-                </div>
-            `;
-        }
+        console.log('✅ Channels rendered successfully');
     }
 
     openChannel(channel) {
-        console.log('Opening channel:', channel.name);
+        console.log('🔗 Opening channel:', channel.name);
         
         if (channel.url && channel.url !== '#' && channel.url.trim() !== '') {
-            // فك تشفير Base64 إذا كان الرابط مشفراً
             try {
+                // محاولة فك تشفير Base64 إذا كان الرابط مشفراً
                 if (channel.url.startsWith('data:')) {
-                    // إذا كان الرابط مشفراً base64
                     const decodedUrl = atob(channel.url.split(',')[1]);
                     window.location.href = decodedUrl;
                 } else {
-                    // إذا كان الرابط عادياً
                     window.location.href = channel.url;
                 }
             } catch (error) {
-                console.error('Error decoding channel URL:', error);
+                console.error('❌ Error decoding channel URL:', error);
                 this.showInstallModal(channel);
             }
         } else {
@@ -532,26 +538,33 @@ class BeinSportApp {
         if (modal) {
             modal.style.display = "block";
             
-            document.getElementById('confirmInstall').onclick = () => {
-                if (channel.downloadUrl) {
-                    window.open(channel.downloadUrl, '_blank');
-                } else {
-                    window.open('https://play.google.com/store/apps/details?id=com.xpola.player', '_blank');
-                }
-                this.closeModal();
-            };
+            const confirmBtn = document.getElementById('confirmInstall');
+            const cancelBtn = document.getElementById('cancelInstall');
             
-            document.getElementById('cancelInstall').onclick = () => {
-                this.closeModal();
-            };
+            if (confirmBtn) {
+                confirmBtn.onclick = () => {
+                    const downloadUrl = channel.downloadUrl || 'https://play.google.com/store/apps/details?id=com.xpola.player';
+                    window.open(downloadUrl, '_blank');
+                    this.closeModal();
+                };
+            }
             
-            document.getElementById('dontShowAgain').onclick = function() {
-                if (this.checked) {
-                    localStorage.setItem('appInstallPrompt', 'disabled');
-                } else {
-                    localStorage.removeItem('appInstallPrompt');
-                }
-            };
+            if (cancelBtn) {
+                cancelBtn.onclick = () => {
+                    this.closeModal();
+                };
+            }
+            
+            const dontShowCheckbox = document.getElementById('dontShowAgain');
+            if (dontShowCheckbox) {
+                dontShowCheckbox.onclick = function() {
+                    if (this.checked) {
+                        localStorage.setItem('appInstallPrompt', 'disabled');
+                    } else {
+                        localStorage.removeItem('appInstallPrompt');
+                    }
+                };
+            }
         }
     }
 
@@ -563,11 +576,10 @@ class BeinSportApp {
     }
 
     showAdminLogin() {
-        console.log('Showing admin login modal');
+        console.log('🔐 Showing admin login modal');
         const modal = document.getElementById('loginModal');
         if (modal) {
             modal.style.display = 'block';
-            console.log('Login modal displayed successfully');
             
             setTimeout(() => {
                 const passwordField = document.getElementById('adminPassword');
@@ -576,7 +588,7 @@ class BeinSportApp {
                 }
             }, 100);
         } else {
-            console.error('Login modal not found!');
+            console.error('❌ Login modal not found!');
         }
     }
 
@@ -593,7 +605,7 @@ class BeinSportApp {
     }
 
     setupEventListeners() {
-        console.log('Setting up event listeners...');
+        console.log('🔧 Setting up event listeners...');
         
         // Login toggle button
         const loginToggle = document.getElementById('loginToggle');
@@ -601,19 +613,13 @@ class BeinSportApp {
             loginToggle.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('Login button clicked - Auth state:', window.authManager ? window.authManager.isAuthenticated : 'unknown');
                 
                 if (window.authManager && window.authManager.isAuthenticated) {
-                    console.log('Redirecting to admin panel');
                     window.location.href = 'admin.html';
                 } else {
-                    console.log('Showing login modal');
                     this.showAdminLogin();
                 }
             });
-            console.log('Login toggle event listener added');
-        } else {
-            console.error('Login toggle button not found!');
         }
 
         // Login button in modal
@@ -625,8 +631,6 @@ class BeinSportApp {
                 const email = document.getElementById('adminEmail').value;
                 const password = document.getElementById('adminPassword').value;
                 
-                console.log('Login attempt with email:', email);
-                
                 if (!email || !password) {
                     this.showLoginError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
                     return;
@@ -635,7 +639,6 @@ class BeinSportApp {
                 const result = await authManager.login(email, password);
                 
                 if (result.success) {
-                    console.log('Login successful, redirecting to admin');
                     this.hideAdminLogin();
                     window.location.href = 'admin.html';
                 } else {
@@ -673,7 +676,7 @@ class BeinSportApp {
             });
         }
 
-        console.log('All event listeners setup completed');
+        console.log('✅ Event listeners setup completed');
     }
 
     showLoginError(message) {
@@ -688,7 +691,7 @@ class BeinSportApp {
         }
     }
 
-    // تنظيف الاشتراكات عند الخروج
+    // تنظيف الاشتراكات
     destroy() {
         if (this.sectionsUnsubscribe) {
             this.sectionsUnsubscribe();
@@ -699,9 +702,9 @@ class BeinSportApp {
     }
 }
 
-// Initialize everything when DOM is loaded
+// التهيئة عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('DOM loaded, starting initialization...');
+    console.log('🏠 DOM loaded, starting initialization...');
     
     try {
         window.authManager = new AuthManager();
@@ -709,22 +712,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => {
             try {
                 window.app = new BeinSportApp();
-                console.log('App initialized successfully');
             } catch (appError) {
-                console.error('Failed to initialize app:', appError);
+                console.error('❌ Failed to initialize app:', appError);
             }
         }, 500);
         
     } catch (error) {
-        console.error('Failed to initialize auth manager:', error);
+        console.error('❌ Failed to initialize auth manager:', error);
     }
 });
 
 // Fallback initialization
 window.addEventListener('load', () => {
     const loginToggle = document.getElementById('loginToggle');
-    if (loginToggle && !loginToggle.hasEventListener) {
-        loginToggle.hasEventListener = true;
+    if (loginToggle) {
         loginToggle.addEventListener('click', (e) => {
             e.preventDefault();
             const modal = document.getElementById('loginModal');
