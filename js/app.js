@@ -60,6 +60,11 @@ class AuthManager {
     }
 
     setupAuthListener() {
+        if (typeof auth === 'undefined') {
+            console.log('Auth not available, using fallback');
+            return;
+        }
+
         auth.onAuthStateChanged((user) => {
             console.log('Auth state changed:', user ? 'User signed in' : 'User signed out');
             if (user) {
@@ -194,8 +199,6 @@ class BeinSportApp {
         this.sections = [];
         this.channels = [];
         this.currentSection = null;
-        this.unsubscribeSections = null;
-        this.unsubscribeChannels = null;
         this.init();
     }
 
@@ -205,11 +208,11 @@ class BeinSportApp {
         // Set current year
         document.getElementById('currentYear').textContent = new Date().getFullYear();
         
+        // Setup event listeners FIRST
+        this.setupEventListeners();
+        
         // Wait for auth to be ready
         await this.waitForAuth();
-        
-        // Setup event listeners
-        this.setupEventListeners();
         
         // Load sections and channels
         await this.loadSections();
@@ -225,7 +228,7 @@ class BeinSportApp {
             const checkAuth = () => {
                 attempts++;
                 
-                if (authManager.authReady) {
+                if (authManager && authManager.authReady) {
                     console.log("Auth ready after", attempts, "attempts");
                     resolve(true);
                     return;
@@ -301,16 +304,25 @@ class BeinSportApp {
     }
 
     renderSections() {
-        const sectionsContainer = document.getElementById('sectionsContainer');
+        // Create sections container if it doesn't exist
+        let sectionsContainer = document.getElementById('sectionsContainer');
         if (!sectionsContainer) {
-            console.error('Sections container not found');
-            return;
+            sectionsContainer = document.createElement('div');
+            sectionsContainer.id = 'sectionsContainer';
+            sectionsContainer.className = 'sections-container';
+            
+            // Insert after ticker and before content
+            const ticker = document.querySelector('.ticker-container');
+            const content = document.querySelector('.content');
+            if (ticker && content) {
+                ticker.parentNode.insertBefore(sectionsContainer, content);
+            }
         }
 
         console.log('Rendering sections:', this.sections.length);
         
         sectionsContainer.innerHTML = this.sections.map(section => `
-            <div class="section-tab ${section.isActive ? 'active' : ''}" 
+            <div class="section-tab ${this.currentSection && this.currentSection.id === section.id ? 'active' : ''}" 
                  data-section-id="${section.id}">
                 ${section.name}
             </div>
@@ -323,6 +335,11 @@ class BeinSportApp {
                 this.showSection(sectionId);
             });
         });
+
+        // Set first section as active if none is active
+        if (!this.currentSection && this.sections.length > 0) {
+            this.showSection(this.sections[0].id);
+        }
     }
 
     async showSection(sectionId) {
@@ -332,7 +349,11 @@ class BeinSportApp {
         document.querySelectorAll('.section-tab').forEach(tab => {
             tab.classList.remove('active');
         });
-        document.querySelector(`[data-section-id="${sectionId}"]`).classList.add('active');
+        
+        const activeTab = document.querySelector(`[data-section-id="${sectionId}"]`);
+        if (activeTab) {
+            activeTab.classList.add('active');
+        }
         
         this.currentSection = this.sections.find(s => s.id === sectionId);
         
@@ -343,6 +364,11 @@ class BeinSportApp {
     async loadChannels(sectionId) {
         try {
             const channelsContainer = document.getElementById('channelsContainer');
+            if (!channelsContainer) {
+                console.error('Channels container not found');
+                return;
+            }
+            
             channelsContainer.innerHTML = '<div class="loading">جاري تحميل القنوات...</div>';
             
             // Try Firebase first
@@ -402,6 +428,10 @@ class BeinSportApp {
 
     renderChannels() {
         const container = document.getElementById('channelsContainer');
+        if (!container) {
+            console.error('Channels container not found');
+            return;
+        }
         
         if (!this.channels || this.channels.length === 0) {
             container.innerHTML = '<div class="loading">لا توجد قنوات متاحة في هذا القسم</div>';
@@ -482,6 +512,14 @@ class BeinSportApp {
         if (modal) {
             modal.style.display = 'block';
             console.log('Login modal displayed successfully');
+            
+            // Focus on password field
+            setTimeout(() => {
+                const passwordField = document.getElementById('adminPassword');
+                if (passwordField) {
+                    passwordField.focus();
+                }
+            }, 100);
         } else {
             console.error('Login modal not found!');
         }
@@ -502,14 +540,15 @@ class BeinSportApp {
     setupEventListeners() {
         console.log('Setting up event listeners...');
         
-        // Login toggle button
+        // Login toggle button - FIXED VERSION
         const loginToggle = document.getElementById('loginToggle');
         if (loginToggle) {
             loginToggle.addEventListener('click', (e) => {
                 e.preventDefault();
-                console.log('Login button clicked - Auth state:', authManager.isAuthenticated);
+                e.stopPropagation();
+                console.log('Login button clicked - Auth state:', window.authManager ? window.authManager.isAuthenticated : 'unknown');
                 
-                if (authManager.isAuthenticated) {
+                if (window.authManager && window.authManager.isAuthenticated) {
                     console.log('Redirecting to admin panel');
                     window.location.href = 'admin.html';
                 } else {
@@ -518,6 +557,8 @@ class BeinSportApp {
                 }
             });
             console.log('Login toggle event listener added');
+        } else {
+            console.error('Login toggle button not found!');
         }
 
         // Login button in modal
@@ -571,7 +612,8 @@ class BeinSportApp {
         if (adminPassword) {
             adminPassword.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    document.getElementById('loginButton').click();
+                    const loginButton = document.getElementById('loginButton');
+                    if (loginButton) loginButton.click();
                 }
             });
         }
@@ -584,15 +626,11 @@ class BeinSportApp {
         if (loginError) {
             loginError.textContent = message;
             loginError.style.display = 'block';
-        }
-    }
-
-    destroy() {
-        if (this.unsubscribeSections) {
-            this.unsubscribeSections();
-        }
-        if (this.unsubscribeChannels) {
-            this.unsubscribeChannels();
+            
+            // Hide error after 5 seconds
+            setTimeout(() => {
+                loginError.style.display = 'none';
+            }, 5000);
         }
     }
 }
@@ -601,19 +639,38 @@ class BeinSportApp {
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('DOM loaded, starting initialization...');
     
-    // Create auth manager first
-    window.authManager = new AuthManager();
-    
-    // Wait a bit for auth to initialize, then create app
-    setTimeout(() => {
-        window.app = new BeinSportApp();
-    }, 100);
+    try {
+        // Create auth manager first
+        window.authManager = new AuthManager();
+        
+        // Create app after a short delay to ensure auth manager is initialized
+        setTimeout(() => {
+            try {
+                window.app = new BeinSportApp();
+                console.log('App initialized successfully');
+            } catch (appError) {
+                console.error('Failed to initialize app:', appError);
+            }
+        }, 500);
+        
+    } catch (error) {
+        console.error('Failed to initialize auth manager:', error);
+    }
 });
 
-// Cleanup
-window.addEventListener('beforeunload', () => {
-    if (window.app) {
-        window.app.destroy();
+// Fallback initialization in case of errors
+window.addEventListener('load', () => {
+    // Ensure login button works even if app initialization fails
+    const loginToggle = document.getElementById('loginToggle');
+    if (loginToggle && !loginToggle.hasEventListener) {
+        loginToggle.hasEventListener = true;
+        loginToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            const modal = document.getElementById('loginModal');
+            if (modal) {
+                modal.style.display = 'block';
+            }
+        });
     }
 });
 [file content end]
