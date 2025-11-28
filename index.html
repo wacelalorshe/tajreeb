@@ -468,6 +468,20 @@
             }
         });
     </script>
+<button id="refreshData" style="position: fixed; bottom: 60px; right: 20px; z-index: 1000; 
+       background: #FF5200; color: white; border: none; border-radius: 50%; 
+       width: 50px; height: 50px; font-size: 20px; cursor: pointer;">
+    🔄
+</button>
+
+<script>
+document.getElementById('refreshData').addEventListener('click', function() {
+    if (window.app) {
+        window.app.loadData();
+    }
+});
+</script>
+    
 </body>
 </html>
 [file content end]
