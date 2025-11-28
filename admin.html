@@ -1,3 +1,5 @@
+[file name]: admin.html
+[file content begin]
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -8,7 +10,7 @@
     <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.0/css/line.css">
     <link rel="stylesheet" href="css/style.css">
     <style>
-        /* الأنماط السابقة تبقى كما هي */
+        /* الأنماط الأساسية */
         body {
             background: linear-gradient(to right, #322769, #151825, #322769);
             color: white;
@@ -38,8 +40,31 @@
             margin: 50px 0;
             border: 2px solid #42318F;
         }
+
+        .firebase-status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
         
-        /* باقي الأنماط تبقى كما هي */
+        .firebase-success {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid #28a745;
+            color: #28a745;
+        }
+        
+        .firebase-error {
+            background: rgba(220, 53, 69, 0.2);
+            border: 1px solid #dc3545;
+            color: #dc3545;
+        }
+        
+        .firebase-warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+            color: #ffc107;
+        }
     </style>
 </head>
 <body>
@@ -53,13 +78,187 @@
                     </h1>
                     <p class="text-muted">إدارة قنوات BEIN SPORT والأقسام</p>
                 </div>
+
+                <!-- Firebase Status -->
+                <div id="firebaseStatus" class="firebase-status" style="display: none;">
+                    <i class="uil uil-info-circle"></i>
+                    <span id="firebaseStatusText">جاري التحقق من اتصال قاعدة البيانات...</span>
+                </div>
                 
-                <!-- Admin Panel (shown when authenticated) -->
+                <!-- Admin Panel -->
                 <div id="adminPanel" class="admin-panel" style="display: none;">
-                    <!-- Firebase Connection Status -->
-                    <div id="firebaseConnection" class="alert alert-warning" style="display: none;">
-                        <i class="uil uil-exclamation-triangle"></i>
-                        <strong>تنبيه:</strong> لا يمكن الاتصال بقاعدة البيانات. تأكد من اتصال الإنترنت وقواعد Firestore.
+                    <!-- ستتم إضافة المحتوى ديناميكياً -->
+                </div>
+
+                <!-- Login Required -->
+                <div id="loginRequired" class="login-required" style="display: none;">
+                    <div class="mb-4">
+                        <i class="uil uil-lock-alt" style="font-size: 80px; color: #FF5200;"></i>
+                    </div>
+                    <h3 class="text-white mb-3">يجب تسجيل الدخول أولاً</h3>
+                    <p class="text-white mb-4" style="font-size: 18px;">يرجى تسجيل الدخول من الصفحة الرئيسية للوصول إلى لوحة الإدارة</p>
+                    <a href="index.html" class="btn btn-primary btn-lg">
+                        <i class="uil uil-signin"></i> العودة للرئيسية لتسجيل الدخول
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <script src="js/firebase-config.js"></script>
+    
+    <script>
+        // ==============================================
+        // نظام إدارة متكامل مع Fallback
+        // ==============================================
+        
+        class AdminManager {
+            constructor() {
+                this.isAuthenticated = false;
+                this.firebaseAvailable = false;
+                this.firestoreAvailable = false;
+                this.sections = [];
+                this.channels = [];
+                this.init();
+            }
+
+            async init() {
+                console.log('AdminManager initializing...');
+                
+                // التحقق من المصادقة أولاً
+                this.checkAuthentication();
+                
+                // ثم التحقق من Firebase
+                await this.checkFirebase();
+                
+                // إعداد واجهة المستخدم
+                this.setupUI();
+            }
+
+            checkAuthentication() {
+                const storedAuth = localStorage.getItem('adminAuth');
+                const storedEmail = localStorage.getItem('adminEmail');
+                
+                console.log('Authentication check:', { storedAuth, storedEmail });
+                
+                this.isAuthenticated = storedAuth === 'true' && storedEmail;
+                
+                if (this.isAuthenticated) {
+                    console.log('User authenticated:', storedEmail);
+                    this.showAdminPanel();
+                } else {
+                    console.log('User not authenticated');
+                    this.showLoginRequired();
+                }
+            }
+
+            async checkFirebase() {
+                try {
+                    // التحقق من توفر Firebase
+                    if (typeof firebase === 'undefined' || typeof db === 'undefined') {
+                        this.showFirebaseStatus('Firebase غير متاح', 'error');
+                        return;
+                    }
+
+                    // اختبار اتصال Firestore
+                    const testDoc = db.collection('test_connection').doc('test');
+                    await testDoc.set({ 
+                        test: true, 
+                        timestamp: new Date(),
+                        message: 'Testing Firestore connection'
+                    });
+                    
+                    await testDoc.delete();
+                    
+                    this.firebaseAvailable = true;
+                    this.firestoreAvailable = true;
+                    this.showFirebaseStatus('الاتصال بقاعدة البيانات ناجح', 'success');
+                    
+                } catch (error) {
+                    console.error('Firebase connection test failed:', error);
+                    
+                    if (error.code === 'permission-denied') {
+                        this.showFirebaseStatus('صلاحيات غير كافية - تحقق من قواعد Firestore', 'error');
+                    } else if (error.code === 'unavailable') {
+                        this.showFirebaseStatus('لا يمكن الاتصال بقاعدة البيانات', 'warning');
+                    } else {
+                        this.showFirebaseStatus('خطأ في الاتصال بقاعدة البيانات: ' + error.message, 'error');
+                    }
+                    
+                    this.firebaseAvailable = false;
+                    this.firestoreAvailable = false;
+                }
+            }
+
+            showFirebaseStatus(message, type) {
+                const statusElement = document.getElementById('firebaseStatus');
+                const statusText = document.getElementById('firebaseStatusText');
+                
+                if (statusElement && statusText) {
+                    statusElement.style.display = 'block';
+                    statusText.textContent = message;
+                    
+                    // إزالة جميع classes السابقة
+                    statusElement.className = 'firebase-status';
+                    
+                    // إضافة class المناسب
+                    if (type === 'success') {
+                        statusElement.classList.add('firebase-success');
+                    } else if (type === 'error') {
+                        statusElement.classList.add('firebase-error');
+                    } else if (type === 'warning') {
+                        statusElement.classList.add('firebase-warning');
+                    }
+                }
+            }
+
+            showAdminPanel() {
+                document.getElementById('adminPanel').style.display = 'block';
+                document.getElementById('loginRequired').style.display = 'none';
+                
+                // تحميل واجهة الإدارة
+                this.loadAdminInterface();
+            }
+
+            showLoginRequired() {
+                document.getElementById('adminPanel').style.display = 'none';
+                document.getElementById('loginRequired').style.display = 'block';
+            }
+
+            loadAdminInterface() {
+                const adminPanel = document.getElementById('adminPanel');
+                
+                adminPanel.innerHTML = `
+                    <!-- Firebase Connection Info -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
+                                <div class="card-body text-center">
+                                    <h5><i class="uil uil-database"></i> حالة قاعدة البيانات</h5>
+                                    <p id="dbStatusText" class="mb-0">
+                                        ${this.firestoreAvailable ? 
+                                            '<span class="text-success">✅ متصل بقاعدة البيانات</span>' : 
+                                            '<span class="text-warning">⚠️ قاعدة البيانات غير متاحة</span>'
+                                        }
+                                    </p>
+                                    ${!this.firestoreAvailable ? `
+                                        <div class="mt-3">
+                                            <button class="btn btn-sm btn-warning me-2" onclick="adminManager.retryFirebaseConnection()">
+                                                <i class="uil uil-refresh"></i> إعادة المحاولة
+                                            </button>
+                                            <button class="btn btn-sm btn-info" onclick="adminManager.showFirebaseHelp()">
+                                                <i class="uil uil-question-circle"></i> مساعدة في الإعداد
+                                            </button>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Stats Overview -->
@@ -84,7 +283,6 @@
                         </div>
                     </div>
 
-                    <!-- باقي المحتوى يبقى كما هو -->
                     <!-- Navigation Tabs -->
                     <ul class="nav nav-tabs nav-tabs-custom mb-4" id="adminTabs">
                         <li class="nav-item">
@@ -97,685 +295,621 @@
                                 <i class="uil uil-tv"></i> إدارة القنوات
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#firebaseTab">
+                                <i class="uil uil-database"></i> إعدادات Firebase
+                            </a>
+                        </li>
                     </ul>
 
                     <!-- Tab Content -->
                     <div class="tab-content">
-                        <!-- Sections Management Tab -->
+                        <!-- Sections Management -->
                         <div class="tab-pane fade show active" id="sectionsTab">
-                            <!-- Add Section Form -->
-                            <div class="card mb-5" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
-                                <div class="card-header card-header-custom">
-                                    <h4 class="mb-0 text-white">
-                                        <i class="uil uil-plus-circle"></i> إضافة قسم جديد
-                                    </h4>
-                                </div>
-                                <div class="card-body">
-                                    <form id="sectionForm">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">اسم القسم *</label>
-                                                    <input type="text" id="sectionName" class="form-control" required placeholder="أدخل اسم القسم">
-                                                </div>
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">ترتيب العرض *</label>
-                                                    <input type="number" id="sectionOrder" class="form-control" value="1" min="1" required>
-                                                    <small class="form-text text-muted">رقم أقل يعني ظهوراً أبكر</small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">حالة القسم</label>
-                                                    <select id="sectionStatus" class="form-control">
-                                                        <option value="active">نشط</option>
-                                                        <option value="inactive">غير نشط</option>
-                                                    </select>
-                                                </div>
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">وصف القسم (اختياري)</label>
-                                                    <textarea id="sectionDescription" class="form-control" rows="3" placeholder="أدخل وصفاً للقسم"></textarea>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <button type="submit" class="btn btn-success w-100 py-3 btn-custom" style="font-size: 16px;">
-                                            <i class="uil uil-plus-circle"></i> إضافة قسم جديد
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                            
-                            <!-- Sections List -->
-                            <div class="card" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
-                                <div class="card-header card-header-custom">
-                                    <h4 class="mb-0 text-white">
-                                        <i class="uil uil-folder"></i> الأقسام المضافة
-                                        <span id="sectionsCount" class="badge bg-primary ms-2">0</span>
-                                    </h4>
-                                </div>
-                                <div class="card-body">
-                                    <div id="sectionsList">
-                                        <!-- Sections will be loaded here -->
-                                        <div class="text-center py-5">
-                                            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                                                <span class="visually-hidden">جاري التحميل...</span>
-                                            </div>
-                                            <p class="mt-3 text-muted">جاري تحميل الأقسام...</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            ${this.loadSectionsTab()}
                         </div>
 
-                        <!-- Channels Management Tab -->
+                        <!-- Channels Management -->
                         <div class="tab-pane fade" id="channelsTab">
-                            <!-- Add Channel Form -->
-                            <div class="card mb-5" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
-                                <div class="card-header card-header-custom">
-                                    <h4 class="mb-0 text-white">
-                                        <i class="uil uil-plus-circle"></i> إضافة قناة جديدة
-                                    </h4>
-                                </div>
-                                <div class="card-body">
-                                    <form id="channelForm">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">اسم القناة *</label>
-                                                    <input type="text" id="channelName" class="form-control" required placeholder="أدخل اسم القناة">
-                                                </div>
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">القسم *</label>
-                                                    <select id="channelSection" class="form-control" required>
-                                                        <option value="">اختر القسم</option>
-                                                        <!-- Sections will be loaded here -->
-                                                    </select>
-                                                </div>
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">رابط الصورة</label>
-                                                    <input type="text" id="channelImage" class="form-control" placeholder="https://example.com/image.jpg">
-                                                    <small class="form-text text-muted">اتركه فارغاً لاستخدام صورة افتراضية</small>
-                                                </div>
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">رابط البث (Base64) *</label>
-                                                    <textarea id="channelUrl" class="form-control" rows="4" required placeholder="أدخل رابط البث المشفر base64"></textarea>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">رابط التطبيق</label>
-                                                    <input type="text" id="channelApp" class="form-control" 
-                                                           value="https://play.google.com/store/apps/details?id=com.xpola.player">
-                                                </div>
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">رابط التحميل</label>
-                                                    <input type="text" id="channelDownload" class="form-control" 
-                                                           value="https://play.google.com/store/apps/details?id=com.xpola.player">
-                                                </div>
-                                                <div class="form-group mb-3">
-                                                    <label class="form-label">ترتيب العرض</label>
-                                                    <input type="number" id="channelOrder" class="form-control" value="1" min="1">
-                                                    <small class="form-text text-muted">رقم أقل يعني ظهوراً أبكر</small>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <button type="submit" class="btn btn-success w-100 py-3 btn-custom" style="font-size: 16px;">
-                                            <i class="uil uil-plus-circle"></i> إضافة قناة جديدة
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                            
-                            <!-- Channels List -->
-                            <div class="card" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
-                                <div class="card-header card-header-custom">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <h4 class="mb-0 text-white">
-                                            <i class="uil uil-list-ui-alt"></i> القنوات المضافة
-                                            <span id="channelsCount" class="badge bg-primary ms-2">0</span>
-                                        </h4>
-                                        <div>
-                                            <select id="filterSection" class="form-select" style="width: auto; background: rgba(255,255,255,0.1); color: white; border: 1px solid #42318F;">
-                                                <option value="">جميع الأقسام</option>
-                                                <!-- Sections will be loaded here -->
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div id="channelsList">
-                                        <!-- Channels will be loaded here -->
-                                        <div class="text-center py-5">
-                                            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
-                                                <span class="visually-hidden">جاري التحميل...</span>
-                                            </div>
-                                            <p class="mt-3 text-muted">جاري تحميل القنوات...</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            ${this.loadChannelsTab()}
+                        </div>
+
+                        <!-- Firebase Settings -->
+                        <div class="tab-pane fade" id="firebaseTab">
+                            ${this.loadFirebaseTab()}
                         </div>
                     </div>
-                    
+
                     <!-- Action Buttons -->
                     <div class="mt-5 text-center">
-                        <a href="index.html" class="btn btn-primary me-3 btn-custom">
+                        <a href="index.html" class="btn btn-primary me-3">
                             <i class="uil uil-home"></i> العودة للرئيسية
                         </a>
-                        <button id="logoutAdmin" class="btn btn-danger btn-custom">
+                        <button onclick="adminManager.logout()" class="btn btn-danger">
                             <i class="uil uil-signout"></i> تسجيل الخروج
                         </button>
                     </div>
-                </div>
+                `;
 
-                <!-- Login Required Message (shown when not authenticated) -->
-                <div id="loginRequired" class="login-required" style="display: none;">
-                    <div class="mb-4">
-                        <i class="uil uil-lock-alt" style="font-size: 80px; color: #FF5200;"></i>
+                // تحميل البيانات
+                this.loadData();
+            }
+
+            loadSectionsTab() {
+                return `
+                    <!-- Add Section Form -->
+                    <div class="card mb-5" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
+                        <div class="card-header card-header-custom">
+                            <h4 class="mb-0 text-white">
+                                <i class="uil uil-plus-circle"></i> إضافة قسم جديد
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <form onsubmit="adminManager.addSection(event)">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">اسم القسم *</label>
+                                            <input type="text" id="sectionName" class="form-control" required placeholder="أدخل اسم القسم">
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">ترتيب العرض *</label>
+                                            <input type="number" id="sectionOrder" class="form-control" value="1" min="1" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">حالة القسم</label>
+                                            <select id="sectionStatus" class="form-control">
+                                                <option value="active">نشط</option>
+                                                <option value="inactive">غير نشط</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">وصف القسم (اختياري)</label>
+                                            <textarea id="sectionDescription" class="form-control" rows="3" placeholder="أدخل وصفاً للقسم"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100 py-3">
+                                    <i class="uil uil-plus-circle"></i> إضافة قسم جديد
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                    <h3 class="text-white mb-3">يجب تسجيل الدخول أولاً</h3>
-                    <p class="text-white mb-4" style="font-size: 18px;">يرجى تسجيل الدخول من الصفحة الرئيسية للوصول إلى لوحة الإدارة</p>
-                    <a href="index.html" class="btn btn-primary btn-lg btn-custom">
-                        <i class="uil uil-signin"></i> العودة للرئيسية لتسجيل الدخول
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-
-    <script src="js/firebase-config.js"></script>
-    
-    <script>
-        // ==============================================
-        // نظام المصادقة المحسّن مع معالجة أخطاء Firestore
-        // ==============================================
-        
-        class AdminAuthManager {
-            constructor() {
-                this.isAuthenticated = false;
-                this.currentUser = null;
-                this.firebaseAvailable = false;
-                this.init();
+                    
+                    <!-- Sections List -->
+                    <div class="card" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
+                        <div class="card-header card-header-custom">
+                            <h4 class="mb-0 text-white">
+                                <i class="uil uil-folder"></i> الأقسام المضافة
+                                <span id="sectionsCount" class="badge bg-primary ms-2">0</span>
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="sectionsList">
+                                <div class="text-center py-5">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">جاري التحميل...</span>
+                                    </div>
+                                    <p class="mt-3 text-muted">جاري تحميل الأقسام...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
             }
 
-            async init() {
-                console.log('AdminAuthManager initializing...');
-                
-                // التحقق من توفر Firebase أولاً
-                this.checkFirebaseAvailability();
-                
-                // التحقق من المصادقة باستخدام localStorage
-                this.checkAuthFromStorage();
-                
-                // ثم إعداد مستمع Firebase إذا كان متاحاً
-                this.setupAuthListener();
+            loadChannelsTab() {
+                return `
+                    <!-- Add Channel Form -->
+                    <div class="card mb-5" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
+                        <div class="card-header card-header-custom">
+                            <h4 class="mb-0 text-white">
+                                <i class="uil uil-plus-circle"></i> إضافة قناة جديدة
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <form onsubmit="adminManager.addChannel(event)">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">اسم القناة *</label>
+                                            <input type="text" id="channelName" class="form-control" required placeholder="أدخل اسم القناة">
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">القسم *</label>
+                                            <select id="channelSection" class="form-control" required>
+                                                <option value="">اختر القسم</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">رابط الصورة</label>
+                                            <input type="text" id="channelImage" class="form-control" placeholder="https://example.com/image.jpg">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">رابط البث *</label>
+                                            <textarea id="channelUrl" class="form-control" rows="3" required placeholder="أدخل رابط البث"></textarea>
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">ترتيب العرض</label>
+                                            <input type="number" id="channelOrder" class="form-control" value="1" min="1">
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100 py-3">
+                                    <i class="uil uil-plus-circle"></i> إضافة قناة جديدة
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Channels List -->
+                    <div class="card" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
+                        <div class="card-header card-header-custom">
+                            <h4 class="mb-0 text-white">
+                                <i class="uil uil-list-ui-alt"></i> القنوات المضافة
+                                <span id="channelsCount" class="badge bg-primary ms-2">0</span>
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="channelsList">
+                                <div class="text-center py-5">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">جاري التحميل...</span>
+                                    </div>
+                                    <p class="mt-3 text-muted">جاري تحميل القنوات...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
             }
 
-            checkFirebaseAvailability() {
-                this.firebaseAvailable = typeof firebase !== 'undefined' && 
-                                       typeof db !== 'undefined' && 
-                                       typeof auth !== 'undefined';
-                
-                console.log('Firebase available:', this.firebaseAvailable);
-                
-                if (!this.firebaseAvailable) {
-                    this.showFirebaseWarning();
+            loadFirebaseTab() {
+                return `
+                    <div class="card" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
+                        <div class="card-header card-header-custom">
+                            <h4 class="mb-0 text-white">
+                                <i class="uil uil-database"></i> إعدادات Firebase
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <h5>حل مشكلة الصلاحيات</h5>
+                            <p>لحل مشكلة "ليس لديك صلاحية للوصول إلى قاعدة البيانات":</p>
+                            
+                            <ol class="text-start">
+                                <li>اذهب إلى <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a></li>
+                                <li>اختر مشروعك "bein-42f9e"</li>
+                                <li>من القائمة اليسرى، اختر <strong>Firestore Database</strong></li>
+                                <li>انقر على <strong>Rules</strong></li>
+                                <li>استبدل القواعد الحالية بـ:</li>
+                            </ol>
+                            
+                            <pre style="background: #1a1a1a; padding: 15px; border-radius: 5px; direction: ltr; text-align: left;">
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
+                            
+                            <ol class="text-start" start="6">
+                                <li>انقر على <strong>Publish</strong></li>
+                                <li>انتظر بضع دقائق ثم أعد تحميل هذه الصفحة</li>
+                            </ol>
+                            
+                            <div class="mt-4">
+                                <button class="btn btn-primary" onclick="adminManager.retryFirebaseConnection()">
+                                    <i class="uil uil-refresh"></i> إعادة فحص الاتصال
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            async loadData() {
+                if (this.firestoreAvailable) {
+                    await this.loadDataFromFirestore();
+                } else {
+                    this.loadDataFromLocalStorage();
                 }
             }
 
-            checkAuthFromStorage() {
-                const storedAuth = localStorage.getItem('adminAuth');
-                const storedEmail = localStorage.getItem('adminEmail');
-                
-                console.log('Checking auth from storage:', { storedAuth, storedEmail });
-                
-                if (storedAuth === 'true' && storedEmail) {
-                    this.isAuthenticated = true;
-                    this.currentUser = { email: storedEmail };
-                    console.log('User authenticated from storage:', storedEmail);
-                    this.showAdminPanel();
-                    return true;
+            async loadDataFromFirestore() {
+                try {
+                    // تحميل الأقسام
+                    const sectionsSnapshot = await db.collection('sections').orderBy('order').get();
+                    this.sections = sectionsSnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    // تحميل القنوات
+                    const channelsSnapshot = await db.collection('channels').orderBy('order').get();
+                    this.channels = channelsSnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    this.renderData();
+                    
+                } catch (error) {
+                    console.error('Error loading data from Firestore:', error);
+                    this.showAlert('خطأ في تحميل البيانات من قاعدة البيانات', 'error');
+                    this.loadDataFromLocalStorage();
                 }
-                
-                console.log('No valid authentication found in storage');
-                return false;
             }
 
-            setupAuthListener() {
-                if (!this.firebaseAvailable) {
-                    console.log('Firebase not available, skipping auth listener');
+            loadDataFromLocalStorage() {
+                // تحميل البيانات من localStorage كبديل
+                const storedSections = localStorage.getItem('admin_sections');
+                const storedChannels = localStorage.getItem('admin_channels');
+                
+                if (storedSections) {
+                    this.sections = JSON.parse(storedSections);
+                }
+                
+                if (storedChannels) {
+                    this.channels = JSON.parse(storedChannels);
+                }
+                
+                this.renderData();
+                this.showAlert('جاري استخدام التخزين المحلي كبديل', 'warning');
+            }
+
+            renderData() {
+                this.renderSectionsList();
+                this.renderChannelsList();
+                this.updateStats();
+                this.populateSectionDropdown();
+            }
+
+            renderSectionsList() {
+                const container = document.getElementById('sectionsList');
+                const countElement = document.getElementById('sectionsCount');
+                
+                if (!container) return;
+                
+                if (this.sections.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-5">
+                            <i class="uil uil-folder" style="font-size: 80px; color: #6c757d;"></i>
+                            <h5 class="mt-3 text-muted">لا توجد أقسام مضافة</h5>
+                        </div>
+                    `;
+                    if (countElement) countElement.textContent = '0';
                     return;
                 }
+                
+                container.innerHTML = this.sections.map(section => `
+                    <div class="section-item p-3 mb-3" style="background: linear-gradient(135deg, #2F2562, #3A4266); border-radius: 10px; border: 1px solid #42318F;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="text-white mb-1">${section.name}</h5>
+                                <div class="text-muted">
+                                    <small>الترتيب: ${section.order || 1}</small>
+                                    <span class="mx-2">•</span>
+                                    <small>${section.isActive !== false ? 'نشط' : 'غير نشط'}</small>
+                                </div>
+                            </div>
+                            <button class="btn btn-danger btn-sm" onclick="adminManager.deleteSection('${section.id}')">
+                                <i class="uil uil-trash-alt"></i> حذف
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                if (countElement) countElement.textContent = this.sections.length;
+            }
 
-                try {
-                    auth.onAuthStateChanged((user) => {
-                        console.log('Firebase Auth state changed:', user ? 'User signed in' : 'User signed out');
-                        if (user) {
-                            this.isAuthenticated = true;
-                            this.currentUser = user;
-                            localStorage.setItem('adminAuth', 'true');
-                            localStorage.setItem('adminEmail', user.email);
-                            console.log('User authenticated via Firebase:', user.email);
-                            this.showAdminPanel();
-                        } else {
-                            // إذا لم يكن هناك مستخدم في Firebase، نعتمد على التخزين المحلي
-                            if (!this.isAuthenticated) {
-                                this.showLoginRequired();
-                            }
-                        }
-                    }, (error) => {
-                        console.error('Firebase Auth state change error:', error);
-                        // في حالة خطأ Firebase، نعتمد على التخزين المحلي
-                        if (!this.isAuthenticated) {
-                            this.showLoginRequired();
-                        }
-                    });
-                } catch (error) {
-                    console.error('Error setting up auth listener:', error);
+            renderChannelsList() {
+                const container = document.getElementById('channelsList');
+                const countElement = document.getElementById('channelsCount');
+                
+                if (!container) return;
+                
+                if (this.channels.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-5">
+                            <i class="uil uil-tv-retro" style="font-size: 80px; color: #6c757d;"></i>
+                            <h5 class="mt-3 text-muted">لا توجد قنوات مضافة</h5>
+                        </div>
+                    `;
+                    if (countElement) countElement.textContent = '0';
+                    return;
                 }
+                
+                container.innerHTML = this.channels.map(channel => {
+                    const section = this.sections.find(s => s.id === channel.sectionId);
+                    return `
+                    <div class="channel-item p-3 mb-3" style="background: linear-gradient(135deg, #2F2562, #3A4266); border-radius: 10px; border: 1px solid #42318F;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <img src="${channel.image || 'https://via.placeholder.com/60x40/2F2562/FFFFFF?text=TV'}" 
+                                     alt="${channel.name}" 
+                                     class="rounded me-3"
+                                     style="width: 60px; height: 40px; object-fit: cover;"
+                                     onerror="this.src='https://via.placeholder.com/60x40/2F2562/FFFFFF?text=TV'">
+                                <div>
+                                    <h6 class="text-white mb-1">${channel.name}</h6>
+                                    <div class="text-muted">
+                                        <small>الترتيب: ${channel.order || 1}</small>
+                                        ${section ? `<span class="mx-2">•</span><small>${section.name}</small>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-danger btn-sm" onclick="adminManager.deleteChannel('${channel.id}')">
+                                <i class="uil uil-trash-alt"></i> حذف
+                            </button>
+                        </div>
+                    </div>
+                `}).join('');
+                
+                if (countElement) countElement.textContent = this.channels.length;
             }
 
-            showFirebaseWarning() {
-                const connectionAlert = document.getElementById('firebaseConnection');
-                if (connectionAlert) {
-                    connectionAlert.style.display = 'block';
+            populateSectionDropdown() {
+                const dropdown = document.getElementById('channelSection');
+                if (!dropdown) return;
+                
+                dropdown.innerHTML = '<option value="">اختر القسم</option>' +
+                    this.sections.map(section => 
+                        `<option value="${section.id}">${section.name}</option>`
+                    ).join('');
+            }
+
+            updateStats() {
+                document.getElementById('totalSections').textContent = this.sections.length;
+                document.getElementById('totalChannels').textContent = this.channels.length;
+                document.getElementById('activeSections').textContent = this.sections.filter(s => s.isActive !== false).length;
+            }
+
+            async addSection(event) {
+                event.preventDefault();
+                
+                const sectionData = {
+                    name: document.getElementById('sectionName').value,
+                    order: document.getElementById('sectionOrder').value,
+                    isActive: document.getElementById('sectionStatus').value,
+                    description: document.getElementById('sectionDescription').value
+                };
+                
+                if (!sectionData.name.trim()) {
+                    this.showAlert('يرجى إدخال اسم القسم', 'error');
+                    return;
                 }
-            }
-
-            showAdminPanel() {
-                console.log('Showing admin panel');
-                document.getElementById('adminPanel').style.display = 'block';
-                document.getElementById('loginRequired').style.display = 'none';
-            }
-
-            showLoginRequired() {
-                console.log('Showing login required');
-                document.getElementById('adminPanel').style.display = 'none';
-                document.getElementById('loginRequired').style.display = 'block';
-            }
-
-            async logout() {
+                
                 try {
-                    if (this.firebaseAvailable) {
-                        await auth.signOut();
+                    if (this.firestoreAvailable) {
+                        const docRef = await db.collection('sections').add({
+                            ...sectionData,
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        });
+                        sectionData.id = docRef.id;
+                    } else {
+                        sectionData.id = 'local_' + Date.now();
                     }
                     
-                    this.isAuthenticated = false;
-                    this.currentUser = null;
-                    localStorage.removeItem('adminAuth');
-                    localStorage.removeItem('adminEmail');
+                    this.sections.push(sectionData);
+                    this.saveDataToLocalStorage();
+                    this.renderData();
                     
-                    console.log('Logout successful');
-                    return { success: true };
-                    
-                } catch (error) {
-                    console.error('Logout error:', error);
-                    this.isAuthenticated = false;
-                    this.currentUser = null;
-                    localStorage.removeItem('adminAuth');
-                    localStorage.removeItem('adminEmail');
-                    
-                    return { success: true };
-                }
-            }
-        }
-
-        // ==============================================
-        // نظام إدارة البيانات مع معالجة أخطاء Firestore
-        // ==============================================
-        
-        class DataManager {
-            constructor() {
-                this.sections = [];
-                this.channels = [];
-                this.firebaseAvailable = false;
-                this.checkFirebase();
-            }
-
-            checkFirebase() {
-                this.firebaseAvailable = typeof firebase !== 'undefined' && typeof db !== 'undefined';
-                console.log('Firebase available for data:', this.firebaseAvailable);
-            }
-
-            // دالة مساعدة للتحقق من اتصال Firestore
-            async testFirestoreConnection() {
-                if (!this.firebaseAvailable) {
-                    return { success: false, error: 'Firebase غير متاح' };
-                }
-
-                try {
-                    const testQuery = db.collection('test_connection').doc('test');
-                    await testQuery.set({ test: true, timestamp: new Date() });
-                    await testQuery.delete();
-                    return { success: true };
-                } catch (error) {
-                    return { success: false, error: error.message };
-                }
-            }
-
-            // تحميل الأقسام
-            async loadSections() {
-                if (!this.firebaseAvailable) {
-                    console.log('Firebase not available, using empty sections');
-                    return [];
-                }
-
-                try {
-                    const snapshot = await db.collection('sections').orderBy('order').get();
-                    
-                    if (snapshot.empty) {
-                        console.log('No sections found in database');
-                        return [];
-                    }
-
-                    return snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                } catch (error) {
-                    console.error('Error loading sections:', error);
-                    this.handleFirestoreError(error);
-                    return [];
-                }
-            }
-
-            // تحميل القنوات
-            async loadChannels(sectionId = null) {
-                if (!this.firebaseAvailable) {
-                    console.log('Firebase not available, using empty channels');
-                    return [];
-                }
-
-                try {
-                    let query = db.collection('channels').orderBy('order');
-                    
-                    if (sectionId) {
-                        query = query.where('sectionId', '==', sectionId);
-                    }
-                    
-                    const snapshot = await query.get();
-                    
-                    if (snapshot.empty) {
-                        console.log('No channels found in database');
-                        return [];
-                    }
-
-                    return snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                } catch (error) {
-                    console.error('Error loading channels:', error);
-                    this.handleFirestoreError(error);
-                    return [];
-                }
-            }
-
-            // إضافة قسم جديد
-            async addSection(sectionData) {
-                if (!this.firebaseAvailable) {
-                    throw new Error('لا يمكن الاتصال بقاعدة البيانات');
-                }
-
-                try {
-                    const docRef = await db.collection('sections').add({
-                        name: sectionData.name.trim(),
-                        order: parseInt(sectionData.order) || 1,
-                        isActive: sectionData.isActive === 'active',
-                        description: sectionData.description ? sectionData.description.trim() : '',
-                        createdAt: new Date(),
-                        updatedAt: new Date()
-                    });
-                    
-                    console.log('Section added with ID:', docRef.id);
-                    return { success: true, id: docRef.id };
+                    document.getElementById('sectionForm').reset();
+                    this.showAlert('تم إضافة القسم بنجاح', 'success');
                     
                 } catch (error) {
                     console.error('Error adding section:', error);
-                    this.handleFirestoreError(error);
-                    throw error;
+                    this.showAlert('خطأ في إضافة القسم: ' + error.message, 'error');
                 }
             }
 
-            // إضافة قناة جديدة
-            async addChannel(channelData) {
-                if (!this.firebaseAvailable) {
-                    throw new Error('لا يمكن الاتصال بقاعدة البيانات');
+            async addChannel(event) {
+                event.preventDefault();
+                
+                const channelData = {
+                    name: document.getElementById('channelName').value,
+                    image: document.getElementById('channelImage').value,
+                    url: document.getElementById('channelUrl').value,
+                    order: document.getElementById('channelOrder').value,
+                    sectionId: document.getElementById('channelSection').value
+                };
+                
+                if (!channelData.name.trim() || !channelData.url.trim() || !channelData.sectionId) {
+                    this.showAlert('يرجى ملء جميع الحقول المطلوبة', 'error');
+                    return;
                 }
-
+                
                 try {
-                    const imageUrl = channelData.image && channelData.image.trim() !== '' ? 
-                           channelData.image.trim() : 
-                           'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=' + encodeURIComponent(channelData.name);
+                    if (this.firestoreAvailable) {
+                        const docRef = await db.collection('channels').add({
+                            ...channelData,
+                            appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                            downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                            createdAt: new Date(),
+                            updatedAt: new Date()
+                        });
+                        channelData.id = docRef.id;
+                    } else {
+                        channelData.id = 'local_' + Date.now();
+                    }
                     
-                    const docRef = await db.collection('channels').add({
-                        name: channelData.name.trim(),
-                        image: imageUrl,
-                        url: channelData.url.trim(),
-                        appUrl: channelData.appUrl.trim(),
-                        downloadUrl: channelData.downloadUrl.trim(),
-                        order: parseInt(channelData.order) || 1,
-                        sectionId: channelData.sectionId,
-                        createdAt: new Date(),
-                        updatedAt: new Date()
-                    });
+                    this.channels.push(channelData);
+                    this.saveDataToLocalStorage();
+                    this.renderData();
                     
-                    console.log('Channel added with ID:', docRef.id);
-                    return { success: true, id: docRef.id };
+                    document.getElementById('channelForm').reset();
+                    this.showAlert('تم إضافة القناة بنجاح', 'success');
                     
                 } catch (error) {
                     console.error('Error adding channel:', error);
-                    this.handleFirestoreError(error);
-                    throw error;
+                    this.showAlert('خطأ في إضافة القناة: ' + error.message, 'error');
                 }
             }
 
-            // حذف قسم
             async deleteSection(sectionId) {
-                if (!this.firebaseAvailable) {
-                    throw new Error('لا يمكن الاتصال بقاعدة البيانات');
-                }
-
+                if (!confirm('هل أنت متأكد من حذف هذا القسم؟')) return;
+                
                 try {
-                    await db.collection('sections').doc(sectionId).delete();
+                    if (this.firestoreAvailable) {
+                        await db.collection('sections').doc(sectionId).delete();
+                    }
                     
-                    // حذف القنوات المرتبطة
-                    const channelsSnapshot = await db.collection('channels')
-                        .where('sectionId', '==', sectionId)
-                        .get();
+                    this.sections = this.sections.filter(s => s.id !== sectionId);
+                    this.channels = this.channels.filter(c => c.sectionId !== sectionId);
+                    this.saveDataToLocalStorage();
+                    this.renderData();
                     
-                    const deletePromises = channelsSnapshot.docs.map(doc => doc.ref.delete());
-                    await Promise.all(deletePromises);
-                    
-                    return { success: true };
+                    this.showAlert('تم حذف القسم بنجاح', 'success');
                     
                 } catch (error) {
                     console.error('Error deleting section:', error);
-                    this.handleFirestoreError(error);
-                    throw error;
+                    this.showAlert('خطأ في حذف القسم: ' + error.message, 'error');
                 }
             }
 
-            // حذف قناة
             async deleteChannel(channelId) {
-                if (!this.firebaseAvailable) {
-                    throw new Error('لا يمكن الاتصال بقاعدة البيانات');
-                }
-
+                if (!confirm('هل أنت متأكد من حذف هذه القناة؟')) return;
+                
                 try {
-                    await db.collection('channels').doc(channelId).delete();
-                    return { success: true };
+                    if (this.firestoreAvailable) {
+                        await db.collection('channels').doc(channelId).delete();
+                    }
+                    
+                    this.channels = this.channels.filter(c => c.id !== channelId);
+                    this.saveDataToLocalStorage();
+                    this.renderData();
+                    
+                    this.showAlert('تم حذف القناة بنجاح', 'success');
                     
                 } catch (error) {
                     console.error('Error deleting channel:', error);
-                    this.handleFirestoreError(error);
-                    throw error;
+                    this.showAlert('خطأ في حذف القناة: ' + error.message, 'error');
                 }
             }
 
-            // معالجة أخطاء Firestore
-            handleFirestoreError(error) {
-                let errorMessage = 'حدث خطأ في الاتصال بقاعدة البيانات';
-                
-                if (error.code === 'permission-denied') {
-                    errorMessage = 'ليس لديك صلاحية للوصول إلى قاعدة البيانات. تحقق من قواعد Firestore.';
-                } else if (error.code === 'unavailable') {
-                    errorMessage = 'لا يمكن الاتصال بقاعدة البيانات. تحقق من اتصال الإنترنت.';
-                } else if (error.code === 'not-found') {
-                    errorMessage = 'المجموعة غير موجودة في قاعدة البيانات.';
-                } else {
-                    errorMessage += ': ' + error.message;
-                }
-                
-                this.showError(errorMessage);
-                return errorMessage;
+            saveDataToLocalStorage() {
+                localStorage.setItem('admin_sections', JSON.stringify(this.sections));
+                localStorage.setItem('admin_channels', JSON.stringify(this.channels));
             }
 
-            showError(message) {
+            async retryFirebaseConnection() {
+                this.showFirebaseStatus('جاري إعادة الاتصال بقاعدة البيانات...', 'warning');
+                await this.checkFirebase();
+                
+                if (this.firestoreAvailable) {
+                    await this.loadDataFromFirestore();
+                }
+            }
+
+            showFirebaseHelp() {
+                // الانتقال إلى تبويب Firebase
+                const firebaseTab = document.querySelector('[href="#firebaseTab"]');
+                if (firebaseTab) {
+                    firebaseTab.click();
+                }
+            }
+
+            showAlert(message, type) {
                 // إنشاء عنصر التنبيه
                 const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+                alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
                 alertDiv.innerHTML = `
-                    <i class="uil uil-exclamation-triangle"></i>
                     ${message}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 `;
                 
-                // إضافة التنبيه في الأعلى
+                // إضافة التنبيه
                 const adminPanel = document.getElementById('adminPanel');
                 if (adminPanel) {
                     adminPanel.insertBefore(alertDiv, adminPanel.firstChild);
                 }
                 
-                // إزالة التنبيه تلقائياً بعد 10 ثوانٍ
+                // إزالة التنبيه تلقائياً
                 setTimeout(() => {
                     if (alertDiv.parentNode) {
                         alertDiv.remove();
                     }
-                }, 10000);
-            }
-        }
-
-        // ==============================================
-        // اللوحة الرئيسية للإدارة
-        // ==============================================
-        
-        class AdminPanel {
-            constructor() {
-                this.authManager = new AdminAuthManager();
-                this.dataManager = new DataManager();
-                this.sections = [];
-                this.channels = [];
-                this.filteredChannels = [];
-                this.init();
+                }, 5000);
             }
 
-            async init() {
-                console.log('Admin panel initializing...');
-                
-                // انتظار تهيئة نظام المصادقة
-                setTimeout(() => {
-                    if (this.authManager.isAuthenticated) {
-                        this.setupEventListeners();
-                        this.loadInitialData();
+            logout() {
+                localStorage.removeItem('adminAuth');
+                localStorage.removeItem('adminEmail');
+                window.location.href = 'index.html';
+            }
+
+            setupUI() {
+                // إضافة الأنماط الديناميكية
+                const style = document.createElement('style');
+                style.textContent = `
+                    .stats-card {
+                        background: linear-gradient(135deg, #2F2562, #3A4266);
+                        border-radius: 10px;
+                        padding: 20px;
+                        text-align: center;
+                        border: 1px solid #42318F;
+                        transition: all 0.3s ease;
                     }
-                }, 1000);
+                    .stats-card:hover {
+                        transform: translateY(-5px);
+                        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+                    }
+                    .stats-number {
+                        font-size: 2.5rem;
+                        font-weight: bold;
+                        color: #FF5200;
+                        margin-bottom: 10px;
+                    }
+                    .stats-label {
+                        color: #E1E1E1;
+                        font-size: 14px;
+                    }
+                    .nav-tabs-custom {
+                        border-bottom: 2px solid #42318F;
+                    }
+                    .nav-tabs-custom .nav-link {
+                        color: #E1E1E1;
+                        border: none;
+                        border-radius: 8px 8px 0 0;
+                        margin: 0 5px;
+                        padding: 12px 25px;
+                        transition: all 0.3s ease;
+                    }
+                    .nav-tabs-custom .nav-link.active {
+                        background: linear-gradient(135deg, #322769, #654FD4);
+                        color: white;
+                        border: 1px solid #42318F;
+                        border-bottom: none;
+                    }
+                    .nav-tabs-custom .nav-link:hover {
+                        background: rgba(101, 79, 212, 0.2);
+                        color: white;
+                    }
+                    .card-header-custom {
+                        background: linear-gradient(135deg, #322769, #654FD4) !important;
+                        border-bottom: 2px solid #42318F !important;
+                        padding: 15px 20px;
+                    }
+                `;
+                document.head.appendChild(style);
             }
-
-            async loadInitialData() {
-                console.log('Loading initial data...');
-                
-                // تحميل الأقسام
-                this.sections = await this.dataManager.loadSections();
-                this.renderSectionsList();
-                this.populateSectionDropdowns();
-                
-                // تحميل القنوات
-                this.channels = await this.dataManager.loadChannels();
-                this.filterChannels();
-                
-                this.updateStats();
-            }
-
-            async reloadData() {
-                console.log('Reloading data...');
-                await this.loadInitialData();
-            }
-
-            // باقي الدوال تبقى كما هي مع استبدال استدعاءات Firebase باستدعاءات DataManager
-            // [يتبع نفس المنطق السابق مع تعديل الاستدعاءات]
-            
-            setupEventListeners() {
-                // Section form submission
-                const sectionForm = document.getElementById('sectionForm');
-                if (sectionForm) {
-                    sectionForm.addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        
-                        const section = {
-                            name: document.getElementById('sectionName').value,
-                            order: document.getElementById('sectionOrder').value,
-                            isActive: document.getElementById('sectionStatus').value,
-                            description: document.getElementById('sectionDescription').value
-                        };
-                        
-                        await this.addSection(section);
-                    });
-                }
-
-                // Channel form submission
-                const channelForm = document.getElementById('channelForm');
-                if (channelForm) {
-                    channelForm.addEventListener('submit', async (e) => {
-                        e.preventDefault();
-                        
-                        const channel = {
-                            name: document.getElementById('channelName').value,
-                            image: document.getElementById('channelImage').value,
-                            url: document.getElementById('channelUrl').value,
-                            appUrl: document.getElementById('channelApp').value,
-                            downloadUrl: document.getElementById('channelDownload').value,
-                            order: document.getElementById('channelOrder').value,
-                            sectionId: document.getElementById('channelSection').value
-                        };
-                        
-                        await this.addChannel(channel);
-                    });
-                }
-
-                // Logout button
-                const logoutButton = document.getElementById('logoutAdmin');
-                if (logoutButton) {
-                    logoutButton.addEventListener('click', async () => {
-                        const result = await this.authManager.logout();
-                        if (result.success) {
-                            window.location.href = 'index.html';
-                        }
-                    });
-                }
-
-                console.log('Event listeners setup completed');
-            }
-
-            // دالات العرض والتحديث [تبقى كما هي]
-            // ... (نفس كود العرض السابق)
-
         }
 
-        // التهيئة عند تحميل الصفحة
+        // تهيئة النظام
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('Admin page DOM loaded, initializing...');
-            window.adminPanel = new AdminPanel();
+            window.adminManager = new AdminManager();
         });
-
     </script>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+[file content end]
