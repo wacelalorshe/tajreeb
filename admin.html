@@ -1,3 +1,5 @@
+[file name]: admin.html
+[file content begin]
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -720,67 +722,119 @@
         // Admin Panel Main Code with Sections Support
         // ==============================================
         
-        // Authentication system for admin
+        // Authentication system for admin - FIXED VERSION
         class AdminAuthManager {
             constructor() {
                 this.isAuthenticated = false;
                 this.currentUser = null;
+                this.init();
+            }
+
+            async init() {
+                console.log('AdminAuthManager initializing...');
+                
+                // Check authentication immediately using localStorage
+                this.checkAuthFromStorage();
+                
+                // Then setup Firebase auth listener if available
                 this.setupAuthListener();
             }
 
+            checkAuthFromStorage() {
+                const storedAuth = localStorage.getItem('adminAuth');
+                const storedEmail = localStorage.getItem('adminEmail');
+                
+                console.log('Checking auth from storage:', { storedAuth, storedEmail });
+                
+                if (storedAuth === 'true' && storedEmail) {
+                    this.isAuthenticated = true;
+                    this.currentUser = { email: storedEmail };
+                    console.log('User authenticated from storage:', storedEmail);
+                    this.showAdminPanel();
+                    return true;
+                }
+                
+                console.log('No valid authentication found in storage');
+                return false;
+            }
+
             setupAuthListener() {
+                // If already authenticated from storage, we're done
+                if (this.isAuthenticated) {
+                    return;
+                }
+
+                // Try Firebase authentication if available
                 if (typeof auth !== 'undefined') {
+                    console.log('Setting up Firebase auth listener...');
+                    
                     auth.onAuthStateChanged((user) => {
-                        console.log('Admin Auth state changed:', user ? 'User signed in' : 'User signed out');
+                        console.log('Firebase Auth state changed:', user ? 'User signed in' : 'User signed out');
                         if (user) {
                             this.isAuthenticated = true;
                             this.currentUser = user;
                             localStorage.setItem('adminAuth', 'true');
                             localStorage.setItem('adminEmail', user.email);
+                            console.log('User authenticated via Firebase:', user.email);
                             this.showAdminPanel();
                         } else {
                             this.isAuthenticated = false;
                             this.currentUser = null;
                             localStorage.removeItem('adminAuth');
                             localStorage.removeItem('adminEmail');
+                            console.log('User signed out from Firebase');
                             this.showLoginRequired();
                         }
                     }, (error) => {
-                        console.error('Auth state change error:', error);
-                        this.showLoginRequired();
+                        console.error('Firebase Auth state change error:', error);
+                        // If Firebase fails, check storage again as fallback
+                        if (!this.checkAuthFromStorage()) {
+                            this.showLoginRequired();
+                        }
                     });
                 } else {
-                    console.error('Firebase auth not available in admin');
-                    // Check local storage for fallback auth
-                    const storedAuth = localStorage.getItem('adminAuth');
-                    if (storedAuth === 'true') {
-                        this.isAuthenticated = true;
-                        this.showAdminPanel();
-                    } else {
+                    console.log('Firebase auth not available, using storage only');
+                    // If no Firebase and no storage auth, show login required
+                    if (!this.isAuthenticated) {
                         this.showLoginRequired();
                     }
                 }
             }
 
             checkAuth() {
+                // Always check storage first for reliability
                 const storedAuth = localStorage.getItem('adminAuth');
                 this.isAuthenticated = storedAuth === 'true';
+                
+                console.log('Auth check result:', this.isAuthenticated);
                 return this.isAuthenticated;
             }
 
             async logout() {
                 try {
+                    // Sign out from Firebase if available
                     if (typeof auth !== 'undefined') {
                         await auth.signOut();
                     }
+                    
+                    // Clear local storage
                     this.isAuthenticated = false;
                     this.currentUser = null;
                     localStorage.removeItem('adminAuth');
                     localStorage.removeItem('adminEmail');
+                    
+                    console.log('Logout successful');
                     return { success: true };
+                    
                 } catch (error) {
                     console.error('Logout error:', error);
-                    return { success: false, error: error.message };
+                    // Even if Firebase logout fails, clear local storage
+                    this.isAuthenticated = false;
+                    this.currentUser = null;
+                    localStorage.removeItem('adminAuth');
+                    localStorage.removeItem('adminEmail');
+                    
+                    return { success: true };
                 }
             }
 
@@ -813,8 +867,12 @@
             async init() {
                 console.log('Admin panel initializing...');
                 
+                // Initialize auth manager first
+                await this.authManager.init();
+                
                 // Check authentication state
-                if (this.authManager.checkAuth()) {
+                if (this.authManager.isAuthenticated) {
+                    console.log('User authenticated, setting up admin panel...');
                     await this.setupSectionsListener();
                     await this.setupChannelsListener();
                     this.setupEventListeners();
@@ -822,8 +880,23 @@
                     await this.runFirebaseCheck();
                     this.updateStats();
                 } else {
-                    console.log('User not authenticated, waiting for auth state...');
+                    console.log('User not authenticated, waiting for auth...');
+                    // If not authenticated immediately, wait a bit and check again
+                    setTimeout(() => {
+                        if (this.authManager.checkAuth()) {
+                            this.initAdminFeatures();
+                        }
+                    }, 1000);
                 }
+            }
+
+            async initAdminFeatures() {
+                console.log('Initializing admin features...');
+                await this.setupSectionsListener();
+                await this.setupChannelsListener();
+                this.setupEventListeners();
+                await this.runFirebaseCheck();
+                this.updateStats();
             }
 
             setupSectionsListener() {
