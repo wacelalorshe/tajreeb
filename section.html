@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>قنوات القسم - Aseel TV</title>
+    
+    <!-- CSS Libraries -->
+    <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.0/css/line.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Amita">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    
+    <style>
+        .content {
+            margin-top: 100px;
+            padding: 20px;
+            min-height: calc(100vh - 180px);
+            padding-bottom: 80px;
+        }
+
+        .back-button {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(45deg, #3545FF, #FF5200);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 8px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 1001;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .back-button:hover {
+            transform: translateY(-50%) scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+            color: white;
+            text-decoration: none;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #E1E1E1;
+            font-size: 24px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .section-description {
+            text-align: center;
+            margin-bottom: 40px;
+            color: #E1E1E1;
+            font-size: 16px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-title">
+            <a href="section.html" class="text-box">
+                <span id="sectionHeader">قنوات القسم</span>
+            </a>
+        </div>
+        
+        <!-- Back Button -->
+        <a href="index.html" class="back-button">
+            <i class="uil uil-arrow-left"></i> العودة للأقسام
+        </a>
+    </header>
+    
+    <!-- Ticker -->
+    <div class="ticker-container">
+        <div class="ticker">
+            <span>تنويه هام</span>
+            <ul>
+                <li><a href="https://play.google.com/store/apps/details?id=com.xpola.player" target="_blank">قم بتحديث مشغل الفيديو الخاص بالتطبيق</a></li>
+                <li><a href="https://play.google.com/store/apps/details?id=com.xpola.player" target="_blank">من متجر جوجل بلاي لضمان</a></li>
+                <li><a href="https://play.google.com/store/apps/details?id=com.xpola.player" target="_blank">تشغيل القنوات وعدم التقطيع</a></li>
+                <li><a href="https://play.google.com/store/apps/details?id=com.xpola.player" target="_blank">شكرا لكم متابعينا الكرام</a></li>
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="content">
+        <h1 class="section-title" id="sectionName">قنوات القسم</h1>
+        <div class="section-description" id="sectionDescription">
+            جاري تحميل القنوات...
+        </div>
+        
+        <!-- Channels Grid -->
+        <div id="channelsContainer" class="channels-container">
+            <!-- Channels will be loaded dynamically -->
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+        <p class="copyright">جميع الحقوق محفوظة &copy; <span id="currentYear"></span> Aseel TV</p>
+    </div>
+    
+    <!-- Install Modal -->
+    <div id="installModal" class="modal">
+        <div class="modal-content">
+            <p>لمشاهدة القنوات يجب عليك أولاً تثبيت تطبيق مشغل القنوات الخاص بالتطبيق</p>
+            <div class="dont-show-container">
+                <input type="checkbox" id="dontShowAgain">
+                <label for="dontShowAgain" style="margin-right: 10px;">عدم الإظهار مرة أخرى</label>
+            </div>
+            <div class="modal-buttons">
+                <button id="confirmInstall" class="modal-button">تحميل مشغل القنوات</button>
+                <button id="cancelInstall" class="modal-button cancel-button">الغاء التحميل</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK - MUST BE LOADED FIRST -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <!-- Firebase Configuration -->
+    <script src="js/firebase-config.js"></script>
+    
+    <!-- Section Logic -->
+    <script src="js/section.js"></script>
+</body>
+</html>
