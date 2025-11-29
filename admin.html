@@ -1,5 +1,3 @@
-[file name]: admin.html
-[file content begin]
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -65,6 +63,88 @@
             border: 1px solid #ffc107;
             color: #ffc107;
         }
+
+        /* الأنماط المخصصة */
+        .stats-card {
+            background: linear-gradient(135deg, #2F2562, #3A4266);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #42318F;
+            transition: all 0.3s ease;
+        }
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #FF5200;
+            margin-bottom: 10px;
+        }
+        .stats-label {
+            color: #E1E1E1;
+            font-size: 14px;
+        }
+        .nav-tabs-custom {
+            border-bottom: 2px solid #42318F;
+        }
+        .nav-tabs-custom .nav-link {
+            color: #E1E1E1;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            margin: 0 5px;
+            padding: 12px 25px;
+            transition: all 0.3s ease;
+        }
+        .nav-tabs-custom .nav-link.active {
+            background: linear-gradient(135deg, #322769, #654FD4);
+            color: white;
+            border: 1px solid #42318F;
+            border-bottom: none;
+        }
+        .nav-tabs-custom .nav-link:hover {
+            background: rgba(101, 79, 212, 0.2);
+            color: white;
+        }
+        .card-header-custom {
+            background: linear-gradient(135deg, #322769, #654FD4) !important;
+            border-bottom: 2px solid #42318F !important;
+            padding: 15px 20px;
+        }
+        
+        .section-item, .channel-item {
+            background: linear-gradient(135deg, #2F2562, #3A4266);
+            border-radius: 10px;
+            border: 1px solid #42318F;
+            margin-bottom: 15px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .section-item:hover, .channel-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .form-control {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid #42318F;
+            color: white;
+        }
+        
+        .form-control:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #654FD4;
+            color: white;
+            box-shadow: 0 0 0 0.2rem rgba(101, 79, 212, 0.25);
+        }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+        }
     </style>
 </head>
 <body>
@@ -87,7 +167,7 @@
                 
                 <!-- Admin Panel -->
                 <div id="adminPanel" class="admin-panel" style="display: none;">
-                    <!-- ستتم إضافة المحتوى ديناميكياً -->
+                    <!-- سيتم تعبئة المحتوى ديناميكياً -->
                 </div>
 
                 <!-- Login Required -->
@@ -345,7 +425,7 @@
                             </h4>
                         </div>
                         <div class="card-body">
-                            <form onsubmit="adminManager.addSection(event)">
+                            <form id="sectionForm" onsubmit="adminManager.addSection(event)">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group mb-3">
@@ -410,7 +490,7 @@
                             </h4>
                         </div>
                         <div class="card-body">
-                            <form onsubmit="adminManager.addChannel(event)">
+                            <form id="channelForm" onsubmit="adminManager.addChannel(event)">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group mb-3">
@@ -436,6 +516,10 @@
                                         <div class="form-group mb-3">
                                             <label class="form-label">ترتيب العرض</label>
                                             <input type="number" id="channelOrder" class="form-control" value="1" min="1">
+                                        </div>
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">رابط التطبيق</label>
+                                            <input type="text" id="channelAppUrl" class="form-control" value="https://play.google.com/store/apps/details?id=com.xpola.player">
                                         </div>
                                     </div>
                                 </div>
@@ -548,8 +632,8 @@ service cloud.firestore {
 
             loadDataFromLocalStorage() {
                 // تحميل البيانات من localStorage كبديل
-                const storedSections = localStorage.getItem('admin_sections');
-                const storedChannels = localStorage.getItem('admin_channels');
+                const storedSections = localStorage.getItem('bein_sections');
+                const storedChannels = localStorage.getItem('bein_channels');
                 
                 if (storedSections) {
                     this.sections = JSON.parse(storedSections);
@@ -588,7 +672,7 @@ service cloud.firestore {
                 }
                 
                 container.innerHTML = this.sections.map(section => `
-                    <div class="section-item p-3 mb-3" style="background: linear-gradient(135deg, #2F2562, #3A4266); border-radius: 10px; border: 1px solid #42318F;">
+                    <div class="section-item">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <h5 class="text-white mb-1">${section.name}</h5>
@@ -596,11 +680,14 @@ service cloud.firestore {
                                     <small>الترتيب: ${section.order || 1}</small>
                                     <span class="mx-2">•</span>
                                     <small>${section.isActive !== false ? 'نشط' : 'غير نشط'}</small>
+                                    ${section.description ? `<span class="mx-2">•</span><small>${section.description}</small>` : ''}
                                 </div>
                             </div>
-                            <button class="btn btn-danger btn-sm" onclick="adminManager.deleteSection('${section.id}')">
-                                <i class="uil uil-trash-alt"></i> حذف
-                            </button>
+                            <div>
+                                <button class="btn btn-danger btn-sm" onclick="adminManager.deleteSection('${section.id}')">
+                                    <i class="uil uil-trash-alt"></i> حذف
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `).join('');
@@ -628,7 +715,7 @@ service cloud.firestore {
                 container.innerHTML = this.channels.map(channel => {
                     const section = this.sections.find(s => s.id === channel.sectionId);
                     return `
-                    <div class="channel-item p-3 mb-3" style="background: linear-gradient(135deg, #2F2562, #3A4266); border-radius: 10px; border: 1px solid #42318F;">
+                    <div class="channel-item">
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="d-flex align-items-center">
                                 <img src="${channel.image || 'https://via.placeholder.com/60x40/2F2562/FFFFFF?text=TV'}" 
@@ -675,9 +762,11 @@ service cloud.firestore {
                 
                 const sectionData = {
                     name: document.getElementById('sectionName').value,
-                    order: document.getElementById('sectionOrder').value,
-                    isActive: document.getElementById('sectionStatus').value,
-                    description: document.getElementById('sectionDescription').value
+                    order: parseInt(document.getElementById('sectionOrder').value),
+                    isActive: document.getElementById('sectionStatus').value === 'active',
+                    description: document.getElementById('sectionDescription').value,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
                 };
                 
                 if (!sectionData.name.trim()) {
@@ -686,22 +775,32 @@ service cloud.firestore {
                 }
                 
                 try {
+                    let sectionId;
+                    
                     if (this.firestoreAvailable) {
-                        const docRef = await db.collection('sections').add({
-                            ...sectionData,
-                            createdAt: new Date(),
-                            updatedAt: new Date()
-                        });
-                        sectionData.id = docRef.id;
+                        const docRef = await db.collection('sections').add(sectionData);
+                        sectionId = docRef.id;
+                        console.log('Section added to Firestore with ID:', sectionId);
                     } else {
-                        sectionData.id = 'local_' + Date.now();
+                        sectionId = 'local_' + Date.now();
+                        sectionData.id = sectionId;
                     }
                     
-                    this.sections.push(sectionData);
+                    // إضافة القسم للبيانات المحلية
+                    this.sections.push({
+                        id: sectionId,
+                        ...sectionData
+                    });
+                    
+                    // حفظ البيانات محلياً
                     this.saveDataToLocalStorage();
+                    
+                    // إعادة عرض البيانات
                     this.renderData();
                     
+                    // إعادة تعيين النموذج
                     document.getElementById('sectionForm').reset();
+                    
                     this.showAlert('تم إضافة القسم بنجاح', 'success');
                     
                 } catch (error) {
@@ -717,8 +816,12 @@ service cloud.firestore {
                     name: document.getElementById('channelName').value,
                     image: document.getElementById('channelImage').value,
                     url: document.getElementById('channelUrl').value,
-                    order: document.getElementById('channelOrder').value,
-                    sectionId: document.getElementById('channelSection').value
+                    order: parseInt(document.getElementById('channelOrder').value),
+                    sectionId: document.getElementById('channelSection').value,
+                    appUrl: document.getElementById('channelAppUrl').value || 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                    downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                    createdAt: new Date(),
+                    updatedAt: new Date()
                 };
                 
                 if (!channelData.name.trim() || !channelData.url.trim() || !channelData.sectionId) {
@@ -727,24 +830,32 @@ service cloud.firestore {
                 }
                 
                 try {
+                    let channelId;
+                    
                     if (this.firestoreAvailable) {
-                        const docRef = await db.collection('channels').add({
-                            ...channelData,
-                            appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                            downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                            createdAt: new Date(),
-                            updatedAt: new Date()
-                        });
-                        channelData.id = docRef.id;
+                        const docRef = await db.collection('channels').add(channelData);
+                        channelId = docRef.id;
+                        console.log('Channel added to Firestore with ID:', channelId);
                     } else {
-                        channelData.id = 'local_' + Date.now();
+                        channelId = 'local_' + Date.now();
+                        channelData.id = channelId;
                     }
                     
-                    this.channels.push(channelData);
+                    // إضافة القناة للبيانات المحلية
+                    this.channels.push({
+                        id: channelId,
+                        ...channelData
+                    });
+                    
+                    // حفظ البيانات محلياً
                     this.saveDataToLocalStorage();
+                    
+                    // إعادة عرض البيانات
                     this.renderData();
                     
+                    // إعادة تعيين النموذج
                     document.getElementById('channelForm').reset();
+                    
                     this.showAlert('تم إضافة القناة بنجاح', 'success');
                     
                 } catch (error) {
@@ -754,19 +865,31 @@ service cloud.firestore {
             }
 
             async deleteSection(sectionId) {
-                if (!confirm('هل أنت متأكد من حذف هذا القسم؟')) return;
+                if (!confirm('هل أنت متأكد من حذف هذا القسم؟ سيتم حذف جميع القنوات المرتبطة به.')) return;
                 
                 try {
                     if (this.firestoreAvailable) {
+                        // حذف القسم من Firestore
                         await db.collection('sections').doc(sectionId).delete();
+                        
+                        // حذف جميع القنوات المرتبطة بهذا القسم
+                        const channelsToDelete = this.channels.filter(c => c.sectionId === sectionId);
+                        for (const channel of channelsToDelete) {
+                            await db.collection('channels').doc(channel.id).delete();
+                        }
                     }
                     
+                    // تحديث البيانات المحلية
                     this.sections = this.sections.filter(s => s.id !== sectionId);
                     this.channels = this.channels.filter(c => c.sectionId !== sectionId);
+                    
+                    // حفظ البيانات المحلية
                     this.saveDataToLocalStorage();
+                    
+                    // إعادة عرض البيانات
                     this.renderData();
                     
-                    this.showAlert('تم حذف القسم بنجاح', 'success');
+                    this.showAlert('تم حذف القسم وجميع قنواته بنجاح', 'success');
                     
                 } catch (error) {
                     console.error('Error deleting section:', error);
@@ -782,8 +905,13 @@ service cloud.firestore {
                         await db.collection('channels').doc(channelId).delete();
                     }
                     
+                    // تحديث البيانات المحلية
                     this.channels = this.channels.filter(c => c.id !== channelId);
+                    
+                    // حفظ البيانات المحلية
                     this.saveDataToLocalStorage();
+                    
+                    // إعادة عرض البيانات
                     this.renderData();
                     
                     this.showAlert('تم حذف القناة بنجاح', 'success');
@@ -795,8 +923,13 @@ service cloud.firestore {
             }
 
             saveDataToLocalStorage() {
-                localStorage.setItem('admin_sections', JSON.stringify(this.sections));
-                localStorage.setItem('admin_channels', JSON.stringify(this.channels));
+                try {
+                    localStorage.setItem('bein_sections', JSON.stringify(this.sections));
+                    localStorage.setItem('bein_channels', JSON.stringify(this.channels));
+                    console.log('Data saved to localStorage');
+                } catch (error) {
+                    console.error('Error saving to localStorage:', error);
+                }
             }
 
             async retryFirebaseConnection() {
@@ -846,59 +979,7 @@ service cloud.firestore {
             }
 
             setupUI() {
-                // إضافة الأنماط الديناميكية
-                const style = document.createElement('style');
-                style.textContent = `
-                    .stats-card {
-                        background: linear-gradient(135deg, #2F2562, #3A4266);
-                        border-radius: 10px;
-                        padding: 20px;
-                        text-align: center;
-                        border: 1px solid #42318F;
-                        transition: all 0.3s ease;
-                    }
-                    .stats-card:hover {
-                        transform: translateY(-5px);
-                        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-                    }
-                    .stats-number {
-                        font-size: 2.5rem;
-                        font-weight: bold;
-                        color: #FF5200;
-                        margin-bottom: 10px;
-                    }
-                    .stats-label {
-                        color: #E1E1E1;
-                        font-size: 14px;
-                    }
-                    .nav-tabs-custom {
-                        border-bottom: 2px solid #42318F;
-                    }
-                    .nav-tabs-custom .nav-link {
-                        color: #E1E1E1;
-                        border: none;
-                        border-radius: 8px 8px 0 0;
-                        margin: 0 5px;
-                        padding: 12px 25px;
-                        transition: all 0.3s ease;
-                    }
-                    .nav-tabs-custom .nav-link.active {
-                        background: linear-gradient(135deg, #322769, #654FD4);
-                        color: white;
-                        border: 1px solid #42318F;
-                        border-bottom: none;
-                    }
-                    .nav-tabs-custom .nav-link:hover {
-                        background: rgba(101, 79, 212, 0.2);
-                        color: white;
-                    }
-                    .card-header-custom {
-                        background: linear-gradient(135deg, #322769, #654FD4) !important;
-                        border-bottom: 2px solid #42318F !important;
-                        padding: 15px 20px;
-                    }
-                `;
-                document.head.appendChild(style);
+                // لا حاجة لإضافة أنماط إضافية هنا لأننا أضفناها في الـ style المضمن
             }
         }
 
@@ -912,4 +993,3 @@ service cloud.firestore {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-[file content end]
