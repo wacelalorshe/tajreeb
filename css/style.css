@@ -1477,3 +1477,120 @@ header {
     border-color: #fff;
     box-shadow: 0 0 15px rgba(255, 82, 0, 0.5);
         }
+
+
+
+/* تحسينات الأقسام والتنقل */
+.sections-container {
+    position: fixed;
+    top: 100px;
+    width: 100%;
+    background: linear-gradient(to right, #503FA6, #151825, #2F2562);
+    padding: 10px 20px;
+    z-index: 998;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    border-bottom: 2px solid #42318F;
+    flex-wrap: wrap;
+}
+
+.section-tab {
+    background: linear-gradient(135deg, #322769, #654FD4);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    font-size: 14px;
+    border: 2px solid #42318F;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.section-tab:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(135deg, #FF5200, #3545FF);
+}
+
+.section-tab.active {
+    background: linear-gradient(135deg, #FF5200, #3545FF);
+    border-color: #fff;
+    box-shadow: 0 0 15px rgba(255, 82, 0, 0.5);
+    transform: translateY(-2px);
+}
+
+/* تحسينات التحديث التلقائي */
+.channel-card {
+    animation: fadeIn 0.5s ease-in;
+    cursor: pointer;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #E1E1E1;
+}
+
+.loading i {
+    font-size: 50px;
+    margin-bottom: 15px;
+    color: #654FD4;
+}
+
+/* تحسينات للجوال */
+@media (max-width: 768px) {
+    .sections-container {
+        top: 100px;
+        padding: 8px 15px;
+        gap: 10px;
+    }
+    
+    .section-tab {
+        padding: 6px 15px;
+        font-size: 12px;
+    }
+    
+    .content {
+        margin-top: 140px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sections-container {
+        top: 100px;
+        padding: 5px 10px;
+        gap: 8px;
+    }
+    
+    .section-tab {
+        padding: 5px 12px;
+        font-size: 11px;
+    }
+    
+    .content {
+        margin-top: 130px;
+    }
+}
+
+/* منع التحديد للنص في الأقسام */
+.section-tab {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+}
+
+/* تحسين الأداء للهواتف */
+.channels-container {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
