@@ -1717,3 +1717,201 @@ header {
         font-size: 11px;
     }
 }
+/* أنماط بطاقات الأقسام الجديدة */
+.sections-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 20px 0;
+    justify-items: center;
+}
+
+.section-card {
+    background-image: linear-gradient(to right, #000, #3A4266, #151825, #2F2562, #2F2562, #2F2562, #2F2562,#2F2562, #2F2562, #2F2562, #2F2562, #2F2562, #2F2562, #2F2562, #2F2562,#2F2562, #151825, #3A4266,#000);
+    padding: 20px;
+    box-shadow: 0 0px 5px  rgba(255, 255, 255, 100);
+    background-size: cover;
+    background-position: top center;
+    background-repeat: no-repeat;
+    border-bottom: 10px double  rgba(255, 255, 255, 0.7); 
+    border-top: 8px double rgba(255, 255, 255, 0.7); 
+    border-left: 0px ridge #2F2562;
+    border-right: 0px groove #2F2562;
+    border-radius: 20px 20px 20px 20px;
+    height: 100%;
+    display: block; 
+    width: 95%; 
+    font-weight: bold; 
+    font-family: Arial, sans-serif; 
+    padding: 0px; 
+    overflow: hidden; 
+    justify-content: center; 
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    text-align: center;
+    position: relative;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.section-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+}
+
+.section-card.active {
+    background-image: linear-gradient(to right, #000, #654FD4, #322769, #2F2562, #2F2562, #2F2562, #2F2562,#2F2562, #2F2562, #2F2562, #2F2562, #2F2562, #2F2562, #2F2562, #2F2562,#2F2562, #322769, #654FD4,#000);
+    border-color: #FF5200;
+}
+
+.section-card-link {
+    color: white;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+}
+
+.section-icon {
+    font-size: 40px;
+    margin-bottom: 15px;
+    color: #FF5200;
+    background: rgba(255, 255, 255, 0.1);
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #FF5200;
+}
+
+.section-name {
+    background-image: linear-gradient(to right, #322769, #654FD4, #372B74, #322769, #5A47BE, #654FD4, #372B74,#231086, #2F2562, #322769, #654FD4, #372B74, #322769, #5A47BE, #654FD4, #372B74,#322769, #654FD4, #372B74);
+    padding: 8px 15px;
+    box-shadow: 0 0px 10px  rgba(255, 255, 255, 100);
+    border-top: 3px groove  rgba(0, 0, 0, 100);
+    border-left:0px ridge  #6D42B8;
+    border-right:0px groove  #6D42B8;
+    border-bottom: 3px groove  rgba(0, 0, 0, 5);
+    font-size: 16px;
+    color: #fff;
+    border-radius: 25px;
+    margin-top: 10px;
+    width: 90%; 
+    font-weight: bold; 
+    font-family: Arial, sans-serif; 
+    box-shadow: 0 0px 5px  rgba(255, 255, 255, 100);
+}
+
+.section-description {
+    color: #E1E1E1;
+    font-size: 12px;
+    margin-top: 10px;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.section-badge {
+    background: linear-gradient(45deg, #FF5200, #3545FF);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 15px;
+    font-size: 12px;
+    margin-top: 10px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* تحسينات للعرض على الجوال */
+@media (max-width: 768px) {
+    .sections-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
+        padding: 15px 0;
+    }
+    
+    .section-card {
+        min-height: 160px;
+        padding: 15px;
+    }
+    
+    .section-icon {
+        font-size: 30px;
+        width: 60px;
+        height: 60px;
+    }
+    
+    .section-name {
+        font-size: 14px;
+        padding: 6px 12px;
+    }
+    
+    .section-description {
+        font-size: 11px;
+    }
+    
+    .section-badge {
+        font-size: 11px;
+        padding: 4px 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sections-grid {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 10px;
+        padding: 10px 0;
+    }
+    
+    .section-card {
+        min-height: 140px;
+        padding: 10px;
+    }
+    
+    .section-icon {
+        font-size: 25px;
+        width: 50px;
+        height: 50px;
+        margin-bottom: 10px;
+    }
+    
+    .section-name {
+        font-size: 12px;
+        padding: 5px 10px;
+    }
+    
+    .section-description {
+        font-size: 10px;
+    }
+    
+    .section-badge {
+        font-size: 10px;
+        padding: 3px 8px;
+    }
+}
+
+/* إزالة الأنماط القديمة للأقسام */
+.sections-container {
+    position: relative;
+    top: 0;
+    width: 100%;
+    background: transparent;
+    padding: 10px 20px;
+    z-index: 998;
+    display: block;
+    border-bottom: none;
+    flex-wrap: wrap;
+}
+
+/* إزالة أنماط التبويبات القديمة */
+.section-tab {
+    display: none;
+}
