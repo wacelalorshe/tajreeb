@@ -751,3 +751,88 @@ header {
     color: #E1E1E1;
     font-size: 14px;
 }
+
+
+
+/* أنماط صفحة القسم */
+.back-button {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: linear-gradient(45deg, #3545FF, #FF5200);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 8px 20px;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 1001;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.back-button:hover {
+    transform: translateY(-50%) scale(1.05);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+    color: white;
+    text-decoration: none;
+}
+
+.page-title, .section-title {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #E1E1E1;
+    font-size: 24px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.welcome-message, .section-description {
+    text-align: center;
+    margin-bottom: 40px;
+    color: #E1E1E1;
+    font-size: 16px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+}
+
+/* تحسينات للعرض على الجوال */
+@media (max-width: 768px) {
+    .back-button {
+        padding: 6px 15px;
+        font-size: 12px;
+        left: 10px;
+    }
+    
+    .page-title, .section-title {
+        font-size: 20px;
+    }
+    
+    .welcome-message, .section-description {
+        font-size: 14px;
+        padding: 0 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .back-button {
+        padding: 5px 12px;
+        font-size: 11px;
+        left: 5px;
+    }
+    
+    .page-title, .section-title {
+        font-size: 18px;
+    }
+    
+    .welcome-message, .section-description {
+        font-size: 13px;
+    }
+}
