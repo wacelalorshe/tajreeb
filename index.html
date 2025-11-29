@@ -132,6 +132,46 @@ window.forceRefresh = forceRefresh;
 setTimeout(() => {
     checkData();
 }, 2000);
+
+<script>
+// أداة تشخيص وتحديث فوري
+console.log('🔧 تهيئة أداة التحديث الفوري');
+
+// تحديث فوري عند إضافة بيانات جديدة
+function forceUpdate() {
+    if (window.app) {
+        console.log('🔄 تحديث فوري للبيانات');
+        window.app.loadData();
+    }
+}
+
+// جعل الدالة متاحة globally
+window.forceUpdate = forceUpdate;
+
+// تحديث تلقائي كل 5 ثوانٍ (كإحتياط إضافي)
+setInterval(() => {
+    if (window.app) {
+        window.app.checkForUpdates();
+    }
+}, 5000);
+
+// استمع لأي تحديثات في localStorage
+window.addEventListener('localStorageUpdated', () => {
+    console.log('🎯 تم استقبال تحديث فوري');
+    forceUpdate();
+});
+
+// فحص البيانات الحالية
+function debugData() {
+    console.log('📊 بيانات التطبيق:');
+    console.log('- الأقسام:', JSON.parse(localStorage.getItem('bein_sections') || '[]'));
+    console.log('- القنوات:', JSON.parse(localStorage.getItem('bein_channels') || '[]'));
+    console.log('- القسم النشط:', window.app?.currentSection);
+}
+
+window.debugData = debugData;
+</script>
+    
 </script>
 </body>
 
