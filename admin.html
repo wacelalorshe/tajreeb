@@ -462,6 +462,15 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">صورة القسم (اختياري)</label>
+                                            <input type="text" id="sectionImage" class="form-control" placeholder="رابط الصورة (URL)">
+                                            <small class="text-muted">أدخل رابط الصورة التي تريد عرضها للقسم</small>
+                                        </div>
+                                    </div>
+                                </div>
                                 <button type="submit" class="btn btn-success w-100 py-3">
                                     <i class="uil uil-plus-circle"></i> إضافة قسم جديد
                                 </button>
@@ -682,13 +691,27 @@ service cloud.firestore {
                 container.innerHTML = this.sections.map(section => `
                     <div class="section-item">
                         <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h5 class="text-white mb-1">${section.name}</h5>
-                                <div class="text-muted">
-                                    <small>الترتيب: ${section.order || 1}</small>
-                                    <span class="mx-2">•</span>
-                                    <small>${section.isActive !== false ? 'نشط' : 'غير نشط'}</small>
-                                    ${section.description ? `<span class="mx-2">•</span><small>${section.description}</small>` : ''}
+                            <div class="d-flex align-items-center">
+                                ${section.image ? `
+                                    <img src="${section.image}" alt="${section.name}" 
+                                         class="rounded me-3"
+                                         style="width: 60px; height: 60px; object-fit: cover;"
+                                         onerror="this.src='https://via.placeholder.com/60x60/2F2562/FFFFFF?text=IMG'">
+                                ` : `
+                                    <div class="rounded me-3 d-flex align-items-center justify-content-center"
+                                         style="width: 60px; height: 60px; background: #42318F; color: white;">
+                                        <i class="uil uil-folder"></i>
+                                    </div>
+                                `}
+                                <div>
+                                    <h5 class="text-white mb-1">${section.name}</h5>
+                                    <div class="text-muted">
+                                        <small>الترتيب: ${section.order || 1}</small>
+                                        <span class="mx-2">•</span>
+                                        <small>${section.isActive !== false ? 'نشط' : 'غير نشط'}</small>
+                                        ${section.description ? `<span class="mx-2">•</span><small>${section.description}</small>` : ''}
+                                        ${section.image ? `<span class="mx-2">•</span><small>🖼️</small>` : ''}
+                                    </div>
                                 </div>
                             </div>
                             <div>
@@ -773,6 +796,7 @@ service cloud.firestore {
                     order: parseInt(document.getElementById('sectionOrder').value),
                     isActive: document.getElementById('sectionStatus').value === 'active',
                     description: document.getElementById('sectionDescription').value,
+                    image: document.getElementById('sectionImage').value, // إضافة حقل الصورة
                     createdAt: new Date(),
                     updatedAt: new Date()
                 };
