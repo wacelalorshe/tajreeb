@@ -1,4 +1,4 @@
-// تطبيق Bein Sport - الإصدار المحسن مع الحفظ في Firebase
+// تطبيق Bein Sport - الإصدار المحسن مع دعم صور الأقسام
 class BeinSportApp {
     constructor() {
         this.sections = [];
@@ -36,6 +36,9 @@ class BeinSportApp {
             setTimeout(() => {
                 this.showSection(sectionId);
             }, 100);
+        } else {
+            // إذا لم يكن هناك قسم في الرابط، لا تعرض أي قسم
+            this.hideChannels();
         }
     }
 
@@ -323,21 +326,24 @@ class BeinSportApp {
     renderData() {
         this.renderSections();
         
-        const activeSections = this.getActiveSections();
-        if (activeSections.length > 0) {
-            // إذا لم يكن هناك قسم محدد في الرابط، اعرض القسم الأول
-            const urlParams = new URLSearchParams(window.location.search);
-            const sectionIdFromUrl = urlParams.get('section');
-            
-            if (!sectionIdFromUrl) {
-                if (!this.currentSection || !activeSections.find(s => s.id === this.currentSection.id)) {
-                    this.showSection(activeSections[0].id);
-                } else {
-                    this.renderChannels();
-                }
-            }
-        } else {
-            this.showNoData();
+        // لا تعرض أي قسم افتراضي، فقط أظهر الأقسام
+        // إذا كان هناك قسم في الرابط، سيتم عرضه عبر checkUrlForSection
+        if (!this.currentSection) {
+            this.hideChannels();
+        }
+    }
+
+    // أضف دالة جديدة لإخفاء القنوات
+    hideChannels() {
+        const container = document.getElementById('channelsContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="loading">
+                    <i class="uil uil-tv-retro"></i>
+                    <p>اختر قسمًا لعرض القنوات</p>
+                    <small>انقر على أي قسم لرؤية القنوات المتاحة</small>
+                </div>
+            `;
         }
     }
 
@@ -361,25 +367,30 @@ class BeinSportApp {
             return;
         }
 
-        // عرض الأقسام كبطاقات
+        // عرض الأقسام كبطاقات مع الصور
         container.innerHTML = `
             <div class="sections-grid">
                 ${activeSections.map(section => {
-                    // استخدام الرابط المخصص إذا كان موجوداً، وإلا استخدم معرف القسم
-                    const sectionUrl = section.customUrl ? section.customUrl : section.id;
                     const isActive = this.currentSection?.id === section.id;
                     
                     return `
                         <div class="section-card ${isActive ? 'active' : ''}" 
                              data-section-id="${section.id}">
-                            <a href="?section=${sectionUrl}" target="_blank" class="section-card-link">
-                                <div class="section-icon">
-                                    <i class="uil uil-folder"></i>
-                                </div>
+                            <div class="section-card-link" onclick="app.showSection('${section.id}')">
+                                ${section.image ? `
+                                    <div class="section-image">
+                                        <img src="${section.image}" alt="${section.name}" 
+                                             onerror="this.src='https://via.placeholder.com/200x150/2F2562/FFFFFF?text=No+Image'">
+                                    </div>
+                                ` : `
+                                    <div class="section-icon">
+                                        <i class="uil uil-folder"></i>
+                                    </div>
+                                `}
                                 <div class="section-name">${section.name}</div>
                                 ${section.description ? `<div class="section-description">${section.description}</div>` : ''}
                                 <div class="section-badge">${this.getChannelsCount(section.id)} قناة</div>
-                            </a>
+                            </div>
                         </div>
                     `;
                 }).join('')}
@@ -403,11 +414,7 @@ class BeinSportApp {
                 const sectionId = card.getAttribute('data-section-id');
                 console.log('🎯 نقرة على القسم:', sectionId);
                 
-                // فتح الرابط في صفحة جديدة
-                const sectionLink = card.querySelector('.section-card-link');
-                if (sectionLink) {
-                    window.open(sectionLink.href, '_blank');
-                }
+                this.showSection(sectionId);
             });
         });
     }
@@ -421,6 +428,7 @@ class BeinSportApp {
             return;
         }
 
+        // تحديث حالة الأقسام النشطة
         document.querySelectorAll('.section-card').forEach(card => {
             card.classList.remove('active');
         });
@@ -433,6 +441,10 @@ class BeinSportApp {
         
         this.currentSection = section;
         this.renderChannels();
+        
+        // تحديث URL بدون إعادة تحميل الصفحة
+        const newUrl = window.location.origin + window.location.pathname + '?section=' + sectionId;
+        window.history.pushState({ section: sectionId }, '', newUrl);
     }
 
     renderChannels() {
@@ -614,6 +626,22 @@ class BeinSportApp {
                 e.stopPropagation();
             });
         }
+
+        // إضافة مستمع لتغيير الـ URL
+        window.addEventListener('popstate', (event) => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sectionId = urlParams.get('section');
+            
+            if (sectionId) {
+                this.showSection(sectionId);
+            } else {
+                this.hideChannels();
+                this.currentSection = null;
+                document.querySelectorAll('.section-card').forEach(card => {
+                    card.classList.remove('active');
+                });
+            }
+        });
     }
 
     handleLogin() {
@@ -686,7 +714,15 @@ class BeinSportApp {
             name: 'قنوات بي إن سبورت',
             order: 1,
             isActive: true,
-            description: 'جميع قنوات بي إن سبورت الرياضية'
+            description: 'جميع قنوات بي إن سبورت الرياضية',
+            image: 'https://via.placeholder.com/200x150/2F2562/FFFFFF?text=BEIN+SPORT'
+        }, {
+            id: 'default-2', 
+            name: 'القنوات الرياضية',
+            order: 2,
+            isActive: true,
+            description: 'أفضل القنوات الرياضية',
+            image: 'https://via.placeholder.com/200x150/2F2562/FFFFFF?text=SPORTS'
         }];
         
         this.channels = [
@@ -702,7 +738,7 @@ class BeinSportApp {
             },
             {
                 id: 'default-2',
-                name: 'bein sport 2',
+                name: 'bein sport 2', 
                 image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+2',
                 url: '#',
                 appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
