@@ -199,7 +199,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
     <script src="js/firebase-config.js"></script>
-    <script src="js/firebase-sync.js"></script>
     
     <script>
         // نظام إدارة متكامل مع Firebase
@@ -337,21 +336,16 @@
                         </div>
                     </div>
 
-                    <!-- Sync Actions -->
+                    <!-- Data Actions -->
                     <div class="sync-actions">
-                        <h5 class="text-white mb-3"><i class="uil uil-sync"></i> إجراءات المزامنة</h5>
+                        <h5 class="text-white mb-3"><i class="uil uil-database"></i> إجراءات البيانات</h5>
                         <div class="row">
-                            <div class="col-md-4">
-                                <button class="btn btn-success w-100 mb-2" onclick="adminManager.syncWithFirebase()">
-                                    <i class="uil uil-sync"></i> مزامنة مع Firebase
-                                </button>
-                            </div>
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <button class="btn btn-info w-100 mb-2" onclick="adminManager.exportData()">
                                     <i class="uil uil-import"></i> تصدير البيانات
                                 </button>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-6">
                                 <button class="btn btn-warning w-100 mb-2" onclick="adminManager.importData()">
                                     <i class="uil uil-export"></i> استيراد البيانات
                                 </button>
@@ -940,20 +934,35 @@ service cloud.firestore {
                 }
             }
 
-            async syncWithFirebase() {
-                try {
-                    this.showAlert('جاري المزامنة مع Firebase...', 'info');
-                    await firebaseSyncManager.fullSync();
-                    await this.loadDataFromFirestore();
-                    this.showAlert('تمت المزامنة بنجاح', 'success');
-                } catch (error) {
-                    this.showAlert('فشل المزامنة: ' + error.message, 'error');
-                }
-            }
-
             async exportData() {
                 try {
-                    const data = await firebaseSyncManager.exportData();
+                    if (!this.firestoreAvailable) {
+                        throw new Error('Firebase غير متاح للتصدير');
+                    }
+
+                    const database = db;
+                    if (!database) {
+                        throw new Error('قاعدة البيانات غير متاحة');
+                    }
+
+                    const [sectionsSnapshot, channelsSnapshot] = await Promise.all([
+                        database.collection('sections').get(),
+                        database.collection('channels').get()
+                    ]);
+
+                    const data = {
+                        sections: sectionsSnapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        })),
+                        channels: channelsSnapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        })),
+                        exportedAt: new Date(),
+                        version: '1.0'
+                    };
+
                     const dataStr = JSON.stringify(data, null, 2);
                     const dataBlob = new Blob([dataStr], {type: 'application/json'});
                     
@@ -968,6 +977,7 @@ service cloud.firestore {
                     
                     this.showAlert('تم تصدير البيانات بنجاح', 'success');
                 } catch (error) {
+                    console.error('❌ فشل تصدير البيانات:', error);
                     this.showAlert('فشل تصدير البيانات: ' + error.message, 'error');
                 }
             }
@@ -985,18 +995,68 @@ service cloud.firestore {
                         const text = await file.text();
                         const data = JSON.parse(text);
                         
+                        if (!data.sections || !data.channels) {
+                            throw new Error('ملف البيانات غير صالح');
+                        }
+
                         if (confirm('هل أنت متأكد من استيراد البيانات؟ سيتم استبدال جميع البيانات الحالية.')) {
                             this.showAlert('جاري استيراد البيانات...', 'info');
-                            await firebaseSyncManager.importData(data);
-                            await this.loadDataFromFirestore();
+                            
+                            if (this.firestoreAvailable) {
+                                // حذف البيانات الحالية من Firebase
+                                await this.clearFirebaseData();
+                                
+                                // استيراد الأقسام
+                                const sectionPromises = data.sections.map(section => {
+                                    const { id, ...sectionData } = section;
+                                    return db.collection('sections').doc(id).set(sectionData);
+                                });
+
+                                // استيراد القنوات
+                                const channelPromises = data.channels.map(channel => {
+                                    const { id, ...channelData } = channel;
+                                    return db.collection('channels').doc(id).set(channelData);
+                                });
+
+                                await Promise.all([...sectionPromises, ...channelPromises]);
+                            }
+                            
+                            // تحديث البيانات المحلية
+                            this.sections = data.sections;
+                            this.channels = data.channels;
+                            this.saveDataToLocalStorage();
+                            this.renderData();
+                            
                             this.showAlert('تم استيراد البيانات بنجاح', 'success');
                         }
                     } catch (error) {
+                        console.error('❌ فشل استيراد البيانات:', error);
                         this.showAlert('فشل استيراد البيانات: ' + error.message, 'error');
                     }
                 };
                 
                 input.click();
+            }
+
+            async clearFirebaseData() {
+                if (!this.firestoreAvailable) return;
+
+                try {
+                    // حذف جميع القنوات
+                    const channelsSnapshot = await db.collection('channels').get();
+                    const channelDeletes = channelsSnapshot.docs.map(doc => doc.ref.delete());
+
+                    // حذف جميع الأقسام
+                    const sectionsSnapshot = await db.collection('sections').get();
+                    const sectionDeletes = sectionsSnapshot.docs.map(doc => doc.ref.delete());
+
+                    await Promise.all([...channelDeletes, ...sectionDeletes]);
+                    console.log('✅ تم مسح جميع البيانات من Firebase');
+
+                } catch (error) {
+                    console.error('❌ فشل مسح البيانات:', error);
+                    throw error;
+                }
             }
 
             showAlert(message, type) {
