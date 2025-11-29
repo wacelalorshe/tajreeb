@@ -145,6 +145,14 @@
             border-radius: 10px;
             border: none;
         }
+
+        .sync-actions {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #42318F;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
@@ -191,12 +199,10 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
     <script src="js/firebase-config.js"></script>
+    <script src="js/firebase-sync.js"></script>
     
     <script>
-        // ==============================================
-        // نظام إدارة متكامل مع Fallback
-        // ==============================================
-        
+        // نظام إدارة متكامل مع Firebase
         class AdminManager {
             constructor() {
                 this.isAuthenticated = false;
@@ -210,13 +216,8 @@
             async init() {
                 console.log('AdminManager initializing...');
                 
-                // التحقق من المصادقة أولاً
                 this.checkAuthentication();
-                
-                // ثم التحقق من Firebase
                 await this.checkFirebase();
-                
-                // إعداد واجهة المستخدم
                 this.setupUI();
             }
 
@@ -239,13 +240,11 @@
 
             async checkFirebase() {
                 try {
-                    // التحقق من توفر Firebase
                     if (typeof firebase === 'undefined' || typeof db === 'undefined') {
                         this.showFirebaseStatus('Firebase غير متاح', 'error');
                         return;
                     }
 
-                    // اختبار اتصال Firestore
                     const testDoc = db.collection('test_connection').doc('test');
                     await testDoc.set({ 
                         test: true, 
@@ -283,10 +282,8 @@
                     statusElement.style.display = 'block';
                     statusText.textContent = message;
                     
-                    // إزالة جميع classes السابقة
                     statusElement.className = 'firebase-status';
                     
-                    // إضافة class المناسب
                     if (type === 'success') {
                         statusElement.classList.add('firebase-success');
                     } else if (type === 'error') {
@@ -301,7 +298,6 @@
                 document.getElementById('adminPanel').style.display = 'block';
                 document.getElementById('loginRequired').style.display = 'none';
                 
-                // تحميل واجهة الإدارة
                 this.loadAdminInterface();
             }
 
@@ -337,6 +333,28 @@
                                         </div>
                                     ` : ''}
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sync Actions -->
+                    <div class="sync-actions">
+                        <h5 class="text-white mb-3"><i class="uil uil-sync"></i> إجراءات المزامنة</h5>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <button class="btn btn-success w-100 mb-2" onclick="adminManager.syncWithFirebase()">
+                                    <i class="uil uil-sync"></i> مزامنة مع Firebase
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-info w-100 mb-2" onclick="adminManager.exportData()">
+                                    <i class="uil uil-import"></i> تصدير البيانات
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-warning w-100 mb-2" onclick="adminManager.importData()">
+                                    <i class="uil uil-export"></i> استيراد البيانات
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -411,7 +429,6 @@
                     </div>
                 `;
 
-                // تحميل البيانات
                 this.loadData();
             }
 
@@ -607,14 +624,12 @@ service cloud.firestore {
 
             async loadDataFromFirestore() {
                 try {
-                    // تحميل الأقسام
                     const sectionsSnapshot = await db.collection('sections').orderBy('order').get();
                     this.sections = sectionsSnapshot.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
                     }));
                     
-                    // تحميل القنوات
                     const channelsSnapshot = await db.collection('channels').orderBy('order').get();
                     this.channels = channelsSnapshot.docs.map(doc => ({
                         id: doc.id,
@@ -631,7 +646,6 @@ service cloud.firestore {
             }
 
             loadDataFromLocalStorage() {
-                // تحميل البيانات من localStorage كبديل
                 const storedSections = localStorage.getItem('bein_sections');
                 const storedChannels = localStorage.getItem('bein_channels');
                 
@@ -780,31 +794,25 @@ service cloud.firestore {
                     if (this.firestoreAvailable) {
                         const docRef = await db.collection('sections').add(sectionData);
                         sectionId = docRef.id;
-                        console.log('Section added to Firestore with ID:', sectionId);
+                        console.log('✅ تم إضافة القسم إلى Firebase:', sectionId);
                     } else {
                         sectionId = 'local_' + Date.now();
                         sectionData.id = sectionId;
                     }
                     
-                    // إضافة القسم للبيانات المحلية
                     this.sections.push({
                         id: sectionId,
                         ...sectionData
                     });
                     
-                    // حفظ البيانات محلياً
                     this.saveDataToLocalStorage();
-                    
-                    // إعادة عرض البيانات
                     this.renderData();
-                    
-                    // إعادة تعيين النموذج
                     document.getElementById('sectionForm').reset();
                     
                     this.showAlert('تم إضافة القسم بنجاح', 'success');
                     
                 } catch (error) {
-                    console.error('Error adding section:', error);
+                    console.error('❌ خطأ في إضافة القسم:', error);
                     this.showAlert('خطأ في إضافة القسم: ' + error.message, 'error');
                 }
             }
@@ -835,31 +843,25 @@ service cloud.firestore {
                     if (this.firestoreAvailable) {
                         const docRef = await db.collection('channels').add(channelData);
                         channelId = docRef.id;
-                        console.log('Channel added to Firestore with ID:', channelId);
+                        console.log('✅ تم إضافة القناة إلى Firebase:', channelId);
                     } else {
                         channelId = 'local_' + Date.now();
                         channelData.id = channelId;
                     }
                     
-                    // إضافة القناة للبيانات المحلية
                     this.channels.push({
                         id: channelId,
                         ...channelData
                     });
                     
-                    // حفظ البيانات محلياً
                     this.saveDataToLocalStorage();
-                    
-                    // إعادة عرض البيانات
                     this.renderData();
-                    
-                    // إعادة تعيين النموذج
                     document.getElementById('channelForm').reset();
                     
                     this.showAlert('تم إضافة القناة بنجاح', 'success');
                     
                 } catch (error) {
-                    console.error('Error adding channel:', error);
+                    console.error('❌ خطأ في إضافة القناة:', error);
                     this.showAlert('خطأ في إضافة القناة: ' + error.message, 'error');
                 }
             }
@@ -869,30 +871,24 @@ service cloud.firestore {
                 
                 try {
                     if (this.firestoreAvailable) {
-                        // حذف القسم من Firestore
                         await db.collection('sections').doc(sectionId).delete();
                         
-                        // حذف جميع القنوات المرتبطة بهذا القسم
                         const channelsToDelete = this.channels.filter(c => c.sectionId === sectionId);
                         for (const channel of channelsToDelete) {
                             await db.collection('channels').doc(channel.id).delete();
                         }
                     }
                     
-                    // تحديث البيانات المحلية
                     this.sections = this.sections.filter(s => s.id !== sectionId);
                     this.channels = this.channels.filter(c => c.sectionId !== sectionId);
                     
-                    // حفظ البيانات المحلية
                     this.saveDataToLocalStorage();
-                    
-                    // إعادة عرض البيانات
                     this.renderData();
                     
                     this.showAlert('تم حذف القسم وجميع قنواته بنجاح', 'success');
                     
                 } catch (error) {
-                    console.error('Error deleting section:', error);
+                    console.error('❌ خطأ في حذف القسم:', error);
                     this.showAlert('خطأ في حذف القسم: ' + error.message, 'error');
                 }
             }
@@ -905,19 +901,15 @@ service cloud.firestore {
                         await db.collection('channels').doc(channelId).delete();
                     }
                     
-                    // تحديث البيانات المحلية
                     this.channels = this.channels.filter(c => c.id !== channelId);
                     
-                    // حفظ البيانات المحلية
                     this.saveDataToLocalStorage();
-                    
-                    // إعادة عرض البيانات
                     this.renderData();
                     
                     this.showAlert('تم حذف القناة بنجاح', 'success');
                     
                 } catch (error) {
-                    console.error('Error deleting channel:', error);
+                    console.error('❌ خطأ في حذف القناة:', error);
                     this.showAlert('خطأ في حذف القناة: ' + error.message, 'error');
                 }
             }
@@ -926,7 +918,7 @@ service cloud.firestore {
                 try {
                     localStorage.setItem('bein_sections', JSON.stringify(this.sections));
                     localStorage.setItem('bein_channels', JSON.stringify(this.channels));
-                    console.log('Data saved to localStorage');
+                    console.log('💾 تم حفظ البيانات في التخزين المحلي');
                 } catch (error) {
                     console.error('Error saving to localStorage:', error);
                 }
@@ -942,15 +934,72 @@ service cloud.firestore {
             }
 
             showFirebaseHelp() {
-                // الانتقال إلى تبويب Firebase
                 const firebaseTab = document.querySelector('[href="#firebaseTab"]');
                 if (firebaseTab) {
                     firebaseTab.click();
                 }
             }
 
+            async syncWithFirebase() {
+                try {
+                    this.showAlert('جاري المزامنة مع Firebase...', 'info');
+                    await firebaseSyncManager.fullSync();
+                    await this.loadDataFromFirestore();
+                    this.showAlert('تمت المزامنة بنجاح', 'success');
+                } catch (error) {
+                    this.showAlert('فشل المزامنة: ' + error.message, 'error');
+                }
+            }
+
+            async exportData() {
+                try {
+                    const data = await firebaseSyncManager.exportData();
+                    const dataStr = JSON.stringify(data, null, 2);
+                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                    
+                    const url = URL.createObjectURL(dataBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `bein-sport-backup-${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    this.showAlert('تم تصدير البيانات بنجاح', 'success');
+                } catch (error) {
+                    this.showAlert('فشل تصدير البيانات: ' + error.message, 'error');
+                }
+            }
+
+            async importData() {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                
+                input.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    try {
+                        const text = await file.text();
+                        const data = JSON.parse(text);
+                        
+                        if (confirm('هل أنت متأكد من استيراد البيانات؟ سيتم استبدال جميع البيانات الحالية.')) {
+                            this.showAlert('جاري استيراد البيانات...', 'info');
+                            await firebaseSyncManager.importData(data);
+                            await this.loadDataFromFirestore();
+                            this.showAlert('تم استيراد البيانات بنجاح', 'success');
+                        }
+                    } catch (error) {
+                        this.showAlert('فشل استيراد البيانات: ' + error.message, 'error');
+                    }
+                };
+                
+                input.click();
+            }
+
             showAlert(message, type) {
-                // إنشاء عنصر التنبيه
                 const alertDiv = document.createElement('div');
                 alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
                 alertDiv.innerHTML = `
@@ -958,13 +1007,11 @@ service cloud.firestore {
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 `;
                 
-                // إضافة التنبيه
                 const adminPanel = document.getElementById('adminPanel');
                 if (adminPanel) {
                     adminPanel.insertBefore(alertDiv, adminPanel.firstChild);
                 }
                 
-                // إزالة التنبيه تلقائياً
                 setTimeout(() => {
                     if (alertDiv.parentNode) {
                         alertDiv.remove();
