@@ -17,7 +17,6 @@ function waitForFirebase() {
             
             if (attempts >= maxAttempts) {
                 console.error("❌ Firebase failed to load after", maxAttempts, "attempts");
-                // نستخدم البيانات المحلية كبديل
                 resolve(false);
                 return;
             }
@@ -35,6 +34,8 @@ class DataManager {
         this.sections = [];
         this.channels = [];
         this.firebaseReady = false;
+        this.sectionsUnsubscribe = null;
+        this.channelsUnsubscribe = null;
     }
 
     async loadData() {
@@ -95,10 +96,70 @@ class DataManager {
             // حفظ نسخة محلية من البيانات
             this.saveToLocalStorage();
             
+            // إعداد real-time listeners
+            this.setupRealtimeListeners();
+            
             return true;
         } catch (error) {
             console.error('❌ خطأ في تحميل البيانات من Firebase:', error);
             return false;
+        }
+    }
+
+    setupRealtimeListeners() {
+        if (typeof db === 'undefined' || !db) {
+            console.log('❌ Firestore غير متاح لإعداد المستمعين اللحظيين');
+            return;
+        }
+
+        try {
+            console.log('👂 إعداد المستمعين اللحظيين...');
+            
+            // مستمع للأقسام
+            this.sectionsUnsubscribe = db.collection('sections')
+                .where('isActive', '==', true)
+                .orderBy('order')
+                .onSnapshot((snapshot) => {
+                    console.log('🔄 تم تحديث الأقسام:', snapshot.size);
+                    if (!snapshot.empty) {
+                        this.sections = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        this.saveToLocalStorage();
+                        
+                        // إشعار التطبيق بالتحديث
+                        if (window.app && window.app.onDataUpdated) {
+                            window.app.onDataUpdated('sections');
+                        }
+                    }
+                }, (error) => {
+                    console.error('❌ خطأ في مستمع الأقسام:', error);
+                });
+
+            // مستمع للقنوات
+            this.channelsUnsubscribe = db.collection('channels')
+                .orderBy('order')
+                .onSnapshot((snapshot) => {
+                    console.log('🔄 تم تحديث القنوات:', snapshot.size);
+                    if (!snapshot.empty) {
+                        this.channels = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        this.saveToLocalStorage();
+                        
+                        // إشعار التطبيق بالتحديث
+                        if (window.app && window.app.onDataUpdated) {
+                            window.app.onDataUpdated('channels');
+                        }
+                    }
+                }, (error) => {
+                    console.error('❌ خطأ في مستمع القنوات:', error);
+                });
+
+        } catch (error) {
+            console.error('❌ خطأ في إعداد المستمعين اللحظيين:', error);
         }
     }
 
@@ -181,7 +242,8 @@ class DataManager {
     }
 
     getSections() {
-        return this.sections.filter(section => section.isActive !== false);
+        return this.sections.filter(section => section.isActive !== false)
+                          .sort((a, b) => (a.order || 1) - (b.order || 1));
     }
 
     getChannelsBySection(sectionId) {
@@ -189,19 +251,14 @@ class DataManager {
                            .sort((a, b) => (a.order || 1) - (b.order || 1));
     }
 
-    // تحديث البيانات من Firebase في الخلفية
-    async refreshData() {
-        if (this.firebaseReady) {
-            try {
-                await this.loadFromFirebase();
-                console.log('🔄 تم تحديث البيانات من Firebase');
-                return true;
-            } catch (error) {
-                console.error('❌ خطأ في تحديث البيانات:', error);
-                return false;
-            }
+    // تنظيف الاشتراكات
+    destroy() {
+        if (this.sectionsUnsubscribe) {
+            this.sectionsUnsubscribe();
         }
-        return false;
+        if (this.channelsUnsubscribe) {
+            this.channelsUnsubscribe();
+        }
     }
 }
 
@@ -235,6 +292,34 @@ class BeinSportApp {
         this.setupAutoRefresh();
         
         console.log('✅ تم تهيئة التطبيق بنجاح');
+    }
+
+    // دالة للتعامل مع تحديثات البيانات
+    onDataUpdated(dataType) {
+        console.log(`🔄 تم تحديث البيانات: ${dataType}`);
+        
+        if (dataType === 'sections' || dataType === 'both') {
+            this.renderSections();
+            
+            // إذا كان القسم الحالي لم يعد موجوداً، نعرض القسم الأول
+            if (this.currentSection && !this.dataManager.getSections().find(s => s.id === this.currentSection.id)) {
+                const sections = this.dataManager.getSections();
+                if (sections.length > 0) {
+                    this.showSection(sections[0].id);
+                } else {
+                    this.currentSection = null;
+                    this.renderChannels();
+                }
+            }
+        }
+        
+        if (dataType === 'channels' || dataType === 'both') {
+            if (this.currentSection) {
+                this.renderChannelsForSection(this.currentSection.id);
+            } else {
+                this.renderChannels();
+            }
+        }
     }
 
     renderData() {
@@ -277,6 +362,8 @@ class BeinSportApp {
                 this.showSection(sectionId);
             });
         });
+
+        console.log('✅ تم عرض الأقسام:', sections.length);
     }
 
     showSection(sectionId) {
@@ -308,7 +395,12 @@ class BeinSportApp {
             return;
         }
 
-        const channels = this.dataManager.getChannelsBySection(this.currentSection.id);
+        this.renderChannelsForSection(this.currentSection.id);
+    }
+
+    renderChannelsForSection(sectionId) {
+        const container = document.getElementById('channelsContainer');
+        const channels = this.dataManager.getChannelsBySection(sectionId);
         
         if (channels.length === 0) {
             container.innerHTML = this.getNoChannelsHTML();
@@ -336,6 +428,8 @@ class BeinSportApp {
                 }
             });
         });
+
+        console.log('✅ تم عرض القنوات:', channels.length);
     }
 
     getLoadingHTML() {
@@ -517,13 +611,15 @@ class BeinSportApp {
         // تحديث البيانات كل 30 ثانية إذا كان Firebase متصلاً
         if (this.dataManager.firebaseReady) {
             setInterval(() => {
-                this.dataManager.refreshData().then(success => {
-                    if (success) {
-                        this.renderData();
-                    }
-                });
+                console.log('🔄 التحديث التلقائي للبيانات...');
+                // يمكن إضافة تحديث للبيانات هنا إذا لزم الأمر
             }, 30000);
         }
+    }
+
+    // تنظيف الذاكرة
+    destroy() {
+        this.dataManager.destroy();
     }
 }
 
@@ -549,5 +645,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
             `;
         }
+    }
+});
+
+// Fallback initialization
+window.addEventListener('load', () => {
+    const loginToggle = document.getElementById('loginToggle');
+    if (loginToggle) {
+        loginToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            const modal = document.getElementById('loginModal');
+            if (modal) {
+                modal.style.display = 'block';
+            }
+        });
     }
 });
