@@ -153,6 +153,16 @@
             padding: 20px;
             margin-bottom: 20px;
         }
+
+        .section-image-preview {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 2px solid #42318F;
+            margin-top: 10px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -466,8 +476,9 @@
                                     <div class="col-12">
                                         <div class="form-group mb-3">
                                             <label class="form-label">صورة القسم (اختياري)</label>
-                                            <input type="text" id="sectionImage" class="form-control" placeholder="رابط الصورة (URL)">
+                                            <input type="text" id="sectionImage" class="form-control" placeholder="رابط الصورة (URL)" oninput="adminManager.updateImagePreview(this.value, 'sectionImagePreview')">
                                             <small class="text-muted">أدخل رابط الصورة التي تريد عرضها للقسم</small>
+                                            <img id="sectionImagePreview" class="section-image-preview" alt="معاينة الصورة">
                                         </div>
                                     </div>
                                 </div>
@@ -525,7 +536,8 @@
                                         </div>
                                         <div class="form-group mb-3">
                                             <label class="form-label">رابط الصورة</label>
-                                            <input type="text" id="channelImage" class="form-control" placeholder="https://example.com/image.jpg">
+                                            <input type="text" id="channelImage" class="form-control" placeholder="https://example.com/image.jpg" oninput="adminManager.updateImagePreview(this.value, 'channelImagePreview')">
+                                            <img id="channelImagePreview" class="section-image-preview" alt="معاينة الصورة">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
@@ -826,6 +838,7 @@ service cloud.firestore {
                     this.saveDataToLocalStorage();
                     this.renderData();
                     document.getElementById('sectionForm').reset();
+                    document.getElementById('sectionImagePreview').style.display = 'none';
                     
                     this.showAlert('تم إضافة القسم بنجاح', 'success');
                     
@@ -875,12 +888,23 @@ service cloud.firestore {
                     this.saveDataToLocalStorage();
                     this.renderData();
                     document.getElementById('channelForm').reset();
+                    document.getElementById('channelImagePreview').style.display = 'none';
                     
                     this.showAlert('تم إضافة القناة بنجاح', 'success');
                     
                 } catch (error) {
                     console.error('❌ خطأ في إضافة القناة:', error);
                     this.showAlert('خطأ في إضافة القناة: ' + error.message, 'error');
+                }
+            }
+
+            updateImagePreview(imageUrl, previewId) {
+                const preview = document.getElementById(previewId);
+                if (preview && imageUrl && imageUrl.trim() !== '') {
+                    preview.src = imageUrl;
+                    preview.style.display = 'block';
+                } else {
+                    preview.style.display = 'none';
                 }
             }
 
