@@ -1,305 +1,337 @@
 /**
- * Firebase Checker - أداة التحقق من عمل Firebase
- * يمكن استخدام هذا الملف للتحقق من حالة Firebase في أي صفحة
+ * Firebase Sync Manager - إدارة المزامنة بين Firebase و LocalStorage
  */
 
-class FirebaseChecker {
+class FirebaseSyncManager {
     constructor() {
-        this.results = {
-            firebase: { status: 'unknown', message: '' },
-            auth: { status: 'unknown', message: '' },
-            firestore: { status: 'unknown', message: '' },
-            rules: { status: 'unknown', message: '' }
-        };
+        this.isSyncing = false;
+        this.lastSyncTime = null;
     }
 
-    // التحقق الشامل من Firebase
-    async checkAll() {
-        console.group('🔥 Firebase Comprehensive Check');
-        
-        await this.checkFirebaseSDK();
-        await this.checkAuthentication();
-        await this.checkFirestore();
-        await this.checkFirestoreRules();
-        
-        console.groupEnd();
-        return this.results;
-    }
-
-    // التحقق من تحميل Firebase SDK
-    checkFirebaseSDK() {
-        return new Promise((resolve) => {
-            console.log('🔍 Checking Firebase SDK...');
-            
-            if (typeof firebase === 'undefined') {
-                this.results.firebase = {
-                    status: 'error',
-                    message: 'Firebase SDK لم يتم تحميله بشكل صحيح'
-                };
-                console.error('❌ Firebase SDK غير محمل');
-                resolve(false);
-                return;
-            }
-
-            if (!firebase.apps.length) {
-                this.results.firebase = {
-                    status: 'error',
-                    message: 'لم يتم تهيئة تطبيق Firebase'
-                };
-                console.error('❌ تطبيق Firebase غير مهيأ');
-                resolve(false);
-                return;
-            }
-
-            try {
-                const app = firebase.app();
-                this.results.firebase = {
-                    status: 'success',
-                    message: `Firebase مهيأ باسم: ${app.name}`
-                };
-                console.log('✅ Firebase SDK محمل ومهيأ بشكل صحيح');
-                resolve(true);
-            } catch (error) {
-                this.results.firebase = {
-                    status: 'error',
-                    message: `خطأ في تهيئة Firebase: ${error.message}`
-                };
-                console.error('❌ خطأ في تهيئة Firebase:', error);
-                resolve(false);
-            }
-        });
-    }
-
-    // التحقق من خدمة المصادقة
-    async checkAuthentication() {
-        console.log('🔍 Checking Authentication...');
-        
-        if (typeof auth === 'undefined') {
-            this.results.auth = {
-                status: 'error',
-                message: 'خدمة Authentication غير متاحة'
-            };
-            console.error('❌ خدمة Authentication غير متاحة');
-            return false;
-        }
-
-        try {
-            // التحقق من حالة المستخدم الحالي
-            const user = auth.currentUser;
-            
-            if (user) {
-                this.results.auth = {
-                    status: 'success',
-                    message: `مستخدم مسجل: ${user.email}`
-                };
-                console.log('✅ Authentication نشط - مستخدم مسجل:', user.email);
-            } else {
-                this.results.auth = {
-                    status: 'warning',
-                    message: 'لا يوجد مستخدم مسجل حاليًا'
-                };
-                console.log('⚠️ Authentication نشط - لا يوجد مستخدم مسجل');
-            }
-            
-            return true;
-        } catch (error) {
-            this.results.auth = {
-                status: 'error',
-                message: `خطأ في Authentication: ${error.message}`
-            };
-            console.error('❌ خطأ في Authentication:', error);
-            return false;
-        }
-    }
-
-    // التحقق من Firestore
-    async checkFirestore() {
-        console.log('🔍 Checking Firestore...');
-        
-        if (typeof db === 'undefined') {
-            this.results.firestore = {
-                status: 'error',
-                message: 'خدمة Firestore غير متاحة'
-            };
-            console.error('❌ خدمة Firestore غير متاحة');
-            return false;
-        }
-
-        try {
-            // محاولة قراءة من Firestore
-            const testQuery = db.collection('channels').limit(1);
-            const snapshot = await testQuery.get();
-            
-            this.results.firestore = {
-                status: 'success',
-                message: `Firestore نشط - ${snapshot.size} قناة موجودة`
-            };
-            console.log('✅ Firestore نشط - اتصال ناجح');
-            return true;
-        } catch (error) {
-            this.results.firestore = {
-                status: 'error',
-                message: `خطأ في Firestore: ${error.message}`
-            };
-            console.error('❌ خطأ في Firestore:', error);
-            return false;
-        }
-    }
-
-    // التحقق من قواعد Firestore
-    async checkFirestoreRules() {
-        console.log('🔍 Checking Firestore Rules...');
-        
-        if (typeof db === 'undefined') {
-            this.results.rules = {
-                status: 'error',
-                message: 'لا يمكن التحقق من القواعد - Firestore غير متاح'
-            };
-            return false;
-        }
-
-        try {
-            // محاولة كتابة مستند اختباري (سيتم حذفه فورًا)
-            const testDoc = db.collection('test_rules').doc('permission_test');
-            
-            // محاولة الكتابة
-            await testDoc.set({
-                test: true,
-                timestamp: new Date()
-            });
-            
-            // محاولة القراءة
-            const doc = await testDoc.get();
-            
-            // تنظيف - حذف المستند الاختباري
-            await testDoc.delete();
-            
-            this.results.rules = {
-                status: 'success',
-                message: 'قواعد Firestore تعمل بشكل صحيح'
-            };
-            console.log('✅ قواعد Firestore تعمل بشكل صحيح');
-            return true;
-        } catch (error) {
-            let message = `خطأ في القواعد: ${error.message}`;
-            let status = 'error';
-            
-            if (error.code === 'permission-denied') {
-                message = 'صلاحيات الكتابة مرفوضة - تحقق من قواعد Firestore';
-                status = 'warning';
-                console.warn('⚠️ صلاحيات الكتابة مرفوضة - قد يكون هذا متوقعًا');
-            } else {
-                console.error('❌ خطأ في قواعد Firestore:', error);
-            }
-            
-            this.results.rules = { status, message };
-            return false;
-        }
-    }
-
-    // عرض النتائج في واجهة المستخدم
-    displayResults(containerId = 'firebase-status') {
-        const container = document.getElementById(containerId);
-        if (!container) {
-            console.error('❌ عنصر العرض غير موجود');
+    // مزامنة كاملة للبيانات
+    async fullSync() {
+        if (this.isSyncing) {
+            console.log('⏳ جاري المزامنة بالفعل...');
             return;
         }
 
-        let html = `
-            <div class="firebase-checker">
-                <h3 style="color: #fff; margin-bottom: 20px;">🔥 حالة Firebase</h3>
-        `;
+        this.isSyncing = true;
+        console.log('🔄 بدء المزامنة الكاملة مع Firebase...');
 
-        Object.entries(this.results).forEach(([service, result]) => {
-            const serviceNames = {
-                firebase: 'Firebase SDK',
-                auth: 'المصادقة',
-                firestore: 'قاعدة البيانات',
-                rules: 'قواعد الأمان'
-            };
-
-            const icons = {
-                success: '✅',
-                warning: '⚠️',
-                error: '❌',
-                unknown: '❓'
-            };
-
-            const colors = {
-                success: '#28a745',
-                warning: '#ffc107',
-                error: '#dc3545',
-                unknown: '#6c757d'
-            };
-
-            html += `
-                <div class="service-status" style="
-                    background: rgba(255,255,255,0.1);
-                    padding: 15px;
-                    margin: 10px 0;
-                    border-radius: 8px;
-                    border-left: 4px solid ${colors[result.status]};
-                ">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <strong style="color: #fff;">${serviceNames[service]}</strong>
-                            <div style="color: #ccc; font-size: 14px; margin-top: 5px;">${result.message}</div>
-                        </div>
-                        <span style="font-size: 20px;">${icons[result.status]}</span>
-                    </div>
-                </div>
-            `;
-        });
-
-        html += `</div>`;
-        container.innerHTML = html;
+        try {
+            await this.syncSections();
+            await this.syncChannels();
+            
+            this.lastSyncTime = new Date();
+            console.log('✅ تمت المزامنة الكاملة بنجاح');
+            
+        } catch (error) {
+            console.error('❌ فشل المزامنة:', error);
+            throw error;
+        } finally {
+            this.isSyncing = false;
+        }
     }
 
-    // إنشاء تقرير مفصل
-    generateReport() {
-        console.group('📊 تقرير حالة Firebase');
+    // مزامنة الأقسام
+    async syncSections() {
+        const database = this.getSafeDatabase();
+        if (!database) {
+            throw new Error('قاعدة البيانات غير متاحة');
+        }
+
+        try {
+            // جلب الأقسام من Firebase
+            const sectionsSnapshot = await database.collection('sections')
+                .orderBy('order')
+                .get();
+
+            const firebaseSections = sectionsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            // جلب الأقسام من localStorage
+            const localSections = JSON.parse(localStorage.getItem('bein_sections') || '[]');
+
+            // دمج البيانات
+            const mergedSections = this.mergeData(firebaseSections, localSections, 'sections');
+            
+            // حفظ في localStorage
+            localStorage.setItem('bein_sections', JSON.stringify(mergedSections));
+            
+            // رفع البيانات المدمجة إلى Firebase
+            for (const section of mergedSections) {
+                if (section.id.startsWith('local_')) {
+                    // تحويل البيانات المحلية إلى Firebase
+                    const { id, ...sectionData } = section;
+                    const docRef = await database.collection('sections').add(sectionData);
+                    console.log('✅ تم تحويل القسم المحلي إلى Firebase:', docRef.id);
+                    
+                    // تحديث القنوات المرتبطة بهذا القسم
+                    await this.updateChannelsSectionId(id, docRef.id);
+                }
+            }
+
+            console.log(`✅ تمت مزامنة ${mergedSections.length} قسم`);
+            return mergedSections;
+
+        } catch (error) {
+            console.error('❌ فشل مزامنة الأقسام:', error);
+            throw error;
+        }
+    }
+
+    // مزامنة القنوات
+    async syncChannels() {
+        const database = this.getSafeDatabase();
+        if (!database) {
+            throw new Error('قاعدة البيانات غير متاحة');
+        }
+
+        try {
+            // جلب القنوات من Firebase
+            const channelsSnapshot = await database.collection('channels')
+                .orderBy('order')
+                .get();
+
+            const firebaseChannels = channelsSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            // جلب القنوات من localStorage
+            const localChannels = JSON.parse(localStorage.getItem('bein_channels') || '[]');
+
+            // دمج البيانات
+            const mergedChannels = this.mergeData(firebaseChannels, localChannels, 'channels');
+            
+            // حفظ في localStorage
+            localStorage.setItem('bein_channels', JSON.stringify(mergedChannels));
+            
+            // رفع البيانات المدمجة إلى Firebase
+            for (const channel of mergedChannels) {
+                if (channel.id.startsWith('local_')) {
+                    // تحويل البيانات المحلية إلى Firebase
+                    const { id, ...channelData } = channel;
+                    const docRef = await database.collection('channels').add(channelData);
+                    console.log('✅ تم تحويل القناة المحلية إلى Firebase:', docRef.id);
+                }
+            }
+
+            console.log(`✅ تمت مزامنة ${mergedChannels.length} قناة`);
+            return mergedChannels;
+
+        } catch (error) {
+            console.error('❌ فشل مزامنة القنوات:', error);
+            throw error;
+        }
+    }
+
+    // تحديث sectionId للقنوات عند تغيير ID القسم
+    async updateChannelsSectionId(oldSectionId, newSectionId) {
+        const database = this.getSafeDatabase();
+        if (!database) return;
+
+        try {
+            const channelsSnapshot = await database.collection('channels')
+                .where('sectionId', '==', oldSectionId)
+                .get();
+
+            const updatePromises = [];
+            channelsSnapshot.forEach(doc => {
+                updatePromises.push(
+                    database.collection('channels').doc(doc.id).update({
+                        sectionId: newSectionId
+                    })
+                );
+            });
+
+            await Promise.all(updatePromises);
+            console.log(`✅ تم تحديث ${updatePromises.length} قناة برابط قسم جديد`);
+        } catch (error) {
+            console.error('❌ خطأ في تحديث روابط الأقسام:', error);
+        }
+    }
+
+    // دمج البيانات من Firebase و LocalStorage
+    mergeData(firebaseData, localData, dataType) {
+        const merged = [...firebaseData];
         
-        Object.entries(this.results).forEach(([service, result]) => {
-            const serviceNames = {
-                firebase: 'Firebase SDK',
-                auth: 'المصادقة',
-                firestore: 'قاعدة البيانات',
-                rules: 'قواعد الأمان'
+        for (const localItem of localData) {
+            if (localItem.id.startsWith('local_')) {
+                // البحث عن عنصر مكافئ في بيانات Firebase
+                const equivalent = this.findEquivalent(localItem, firebaseData, dataType);
+                
+                if (!equivalent) {
+                    // إضافة العنصر المحلي إذا لم يوجد مكافئ في Firebase
+                    merged.push(localItem);
+                } else if (this.isNewer(localItem, equivalent)) {
+                    // استبدال العنصر القديم بالأحدث
+                    const index = merged.findIndex(item => item.id === equivalent.id);
+                    if (index !== -1) {
+                        merged[index] = { ...localItem, id: equivalent.id };
+                    }
+                }
+            }
+        }
+
+        return merged;
+    }
+
+    // البحث عن عنصر مكافئ
+    findEquivalent(localItem, firebaseData, dataType) {
+        if (dataType === 'sections') {
+            return firebaseData.find(fbItem => 
+                fbItem.name === localItem.name && 
+                fbItem.order === localItem.order
+            );
+        } else if (dataType === 'channels') {
+            return firebaseData.find(fbItem => 
+                fbItem.name === localItem.name && 
+                fbItem.sectionId === localItem.sectionId
+            );
+        }
+        return null;
+    }
+
+    // التحقق من الأحدث
+    isNewer(item1, item2) {
+        const time1 = item1.updatedAt || item1.createdAt || new Date(0);
+        const time2 = item2.updatedAt || item2.createdAt || new Date(0);
+        return new Date(time1) > new Date(time2);
+    }
+
+    getSafeDatabase() {
+        if (typeof db !== 'undefined' && db !== null) {
+            return db;
+        }
+        
+        if (typeof getFirebaseDb === 'function') {
+            return getFirebaseDb();
+        }
+        
+        return null;
+    }
+
+    // الحصول على حالة المزامنة
+    getSyncStatus() {
+        return {
+            isSyncing: this.isSyncing,
+            lastSyncTime: this.lastSyncTime,
+            firebaseAvailable: this.getSafeDatabase() !== null
+        };
+    }
+
+    // إعادة تعيين كاملة
+    async resetAndSync() {
+        console.log('🔄 إعادة تعيين ومزامنة كاملة...');
+        
+        // حذف البيانات المحلية
+        localStorage.removeItem('bein_sections');
+        localStorage.removeItem('bein_channels');
+        
+        // إعادة التحميل من Firebase
+        await this.fullSync();
+        
+        console.log('✅ تمت إعادة التعيين والمزامنة');
+    }
+
+    // تصدير البيانات من Firebase
+    async exportData() {
+        const database = this.getSafeDatabase();
+        if (!database) {
+            throw new Error('قاعدة البيانات غير متاحة');
+        }
+
+        try {
+            const [sectionsSnapshot, channelsSnapshot] = await Promise.all([
+                database.collection('sections').get(),
+                database.collection('channels').get()
+            ]);
+
+            const data = {
+                sections: sectionsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                })),
+                channels: channelsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                })),
+                exportedAt: new Date(),
+                version: '1.0'
             };
 
-            const icons = {
-                success: '✅',
-                warning: '⚠️',
-                error: '❌',
-                unknown: '❓'
-            };
+            return data;
+        } catch (error) {
+            console.error('❌ فشل تصدير البيانات:', error);
+            throw error;
+        }
+    }
 
-            console.log(`${icons[result.status]} ${serviceNames[service]}: ${result.message}`);
-        });
+    // استيراد البيانات إلى Firebase
+    async importData(data) {
+        const database = this.getSafeDatabase();
+        if (!database) {
+            throw new Error('قاعدة البيانات غير متاحة');
+        }
 
-        console.groupEnd();
-        
-        return this.results;
+        try {
+            // حذف البيانات الحالية
+            await this.clearFirebaseData();
+
+            // استيراد الأقسام
+            const sectionPromises = data.sections.map(section => {
+                const { id, ...sectionData } = section;
+                return database.collection('sections').doc(id).set(sectionData);
+            });
+
+            // استيراد القنوات
+            const channelPromises = data.channels.map(channel => {
+                const { id, ...channelData } = channel;
+                return database.collection('channels').doc(id).set(channelData);
+            });
+
+            await Promise.all([...sectionPromises, ...channelPromises]);
+            console.log('✅ تم استيراد البيانات بنجاح');
+
+        } catch (error) {
+            console.error('❌ فشل استيراد البيانات:', error);
+            throw error;
+        }
+    }
+
+    // مسح بيانات Firebase
+    async clearFirebaseData() {
+        const database = this.getSafeDatabase();
+        if (!database) {
+            throw new Error('قاعدة البيانات غير متاحة');
+        }
+
+        try {
+            // حذف جميع القنوات
+            const channelsSnapshot = await database.collection('channels').get();
+            const channelDeletes = channelsSnapshot.docs.map(doc => doc.ref.delete());
+
+            // حذف جميع الأقسام
+            const sectionsSnapshot = await database.collection('sections').get();
+            const sectionDeletes = sectionsSnapshot.docs.map(doc => doc.ref.delete());
+
+            await Promise.all([...channelDeletes, ...sectionDeletes]);
+            console.log('✅ تم مسح جميع البيانات من Firebase');
+
+        } catch (error) {
+            console.error('❌ فشل مسح البيانات:', error);
+            throw error;
+        }
     }
 }
 
-// استخدام سهل للفحص
-window.firebaseChecker = new FirebaseChecker();
-
-// فحص تلقائي عند تحميل الصفحة
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🔄 بدء الفحص التلقائي لـ Firebase...');
-    
-    await firebaseChecker.checkAll();
-    firebaseChecker.generateReport();
-    
-    // عرض النتائج إذا كان هناك عنصر للعرض
-    if (document.getElementById('firebase-status')) {
-        firebaseChecker.displayResults();
-    }
-});
+// إنشاء نسخة عامة
+window.firebaseSyncManager = new FirebaseSyncManager();
 
 // تصدير للاستخدام في الموديولات
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = FirebaseChecker;
+    module.exports = FirebaseSyncManager;
 }
