@@ -1,45 +1,22 @@
-// تطبيق Bein Sport - الإصدار المحسن مع دعم صور الأقسام
+// تطبيق Bein Sport - الصفحة الرئيسية (الأقسام فقط)
 class BeinSportApp {
     constructor() {
         this.sections = [];
         this.channels = [];
-        this.currentSection = null;
         this.firebaseReady = false;
         this.firebaseError = null;
         this.init();
     }
 
     async init() {
-        console.log('🚀 بدء تشغيل تطبيق Bein Sport...');
+        console.log('🚀 بدء تشغيل تطبيق Bein Sport (الصفحة الرئيسية)...');
         
         document.getElementById('currentYear').textContent = new Date().getFullYear();
         this.setupEventListeners();
         await this.initializeFirebase();
         await this.loadData();
         
-        // التحقق مما إذا كان هناك قسم محدد في الرابط
-        this.checkUrlForSection();
-        
-        this.setupRealTimeUpdates();
-        
         console.log('✅ تم تهيئة التطبيق بنجاح');
-    }
-
-    // دالة جديدة: التحقق من وجود قسم في الرابط
-    checkUrlForSection() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const sectionId = urlParams.get('section');
-        
-        if (sectionId) {
-            console.log('📋 تم العثور على قسم في الرابط:', sectionId);
-            // انتظر قليلاً لتحميل البيانات ثم اعرض القسم
-            setTimeout(() => {
-                this.showSection(sectionId);
-            }, 100);
-        } else {
-            // إذا لم يكن هناك قسم في الرابط، لا تعرض أي قسم
-            this.hideChannels();
-        }
     }
 
     async initializeFirebase() {
@@ -165,7 +142,7 @@ class BeinSportApp {
         try {
             console.log('📡 جاري جلب البيانات من Firebase...');
             
-            // تحميل الأقسام
+            // تحميل الأقسام فقط
             const sectionsSnapshot = await database.collection('sections')
                 .where('isActive', '==', true)
                 .orderBy('order')
@@ -183,36 +160,20 @@ class BeinSportApp {
                 return false;
             }
 
-            // تحميل القنوات
-            const channelsSnapshot = await database.collection('channels')
-                .orderBy('order')
-                .get();
-
+            // تحميل القنوات لتحديد العدد فقط
+            const channelsSnapshot = await database.collection('channels').get();
             if (!channelsSnapshot.empty) {
                 this.channels = channelsSnapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 }));
-                console.log(`✅ تم تحميل ${this.channels.length} قناة من Firebase`);
                 localStorage.setItem('bein_channels', JSON.stringify(this.channels));
-            } else {
-                console.log('ℹ️ لا توجد قنوات في Firebase');
-                return false;
             }
 
             return true;
 
         } catch (error) {
             console.error('❌ خطأ في تحميل البيانات من Firebase:', error);
-            
-            if (error.code === 'permission-denied') {
-                console.error('🔐 خطأ في الصلاحيات - يرجى التحقق من قواعد Firestore');
-            } else if (error.code === 'unavailable') {
-                console.error('🌐 Firebase غير متاح - تحقق من اتصال الإنترنت');
-            } else {
-                console.error('💥 خطأ غير متوقع:', error.message);
-            }
-            
             return false;
         }
     }
@@ -229,10 +190,9 @@ class BeinSportApp {
             
             if (savedChannels) {
                 this.channels = JSON.parse(savedChannels);
-                console.log(`✅ تم تحميل ${this.channels.length} قناة من localStorage`);
             }
             
-            if (this.sections.length === 0 && this.channels.length === 0) {
+            if (this.sections.length === 0) {
                 this.loadDefaultData();
             }
         } catch (error) {
@@ -241,110 +201,8 @@ class BeinSportApp {
         }
     }
 
-    setupRealTimeUpdates() {
-        // تحديث تلقائي كل 30 ثانية للتحقق من التحديثات
-        setInterval(() => {
-            this.checkForUpdates();
-        }, 30000);
-
-        // الاستماع لتحديثات localStorage من التبويبات الأخرى
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'bein_sections' || e.key === 'bein_channels') {
-                console.log('🔄 تم تحديث البيانات من تبويب آخر');
-                this.loadFromLocalStorage();
-                this.renderData();
-            }
-        });
-
-        // إعداد مستمعي Firebase إذا كان متاحاً
-        if (this.firebaseReady) {
-            this.setupFirebaseListeners();
-        }
-    }
-
-    setupFirebaseListeners() {
-        const database = this.getSafeDatabase();
-        if (!database) {
-            console.log('❌ لا يمكن إعداد مستمعي Firebase - قاعدة البيانات غير متاحة');
-            return;
-        }
-
-        try {
-            console.log('👂 جاري إعداد مستمعي Firebase...');
-
-            // مستمع للأقسام
-            database.collection('sections')
-                .where('isActive', '==', true)
-                .orderBy('order')
-                .onSnapshot((snapshot) => {
-                    console.log('🔄 تحديث الأقسام من Firebase');
-                    if (!snapshot.empty) {
-                        this.sections = snapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        this.saveToLocalStorage();
-                        this.renderSections();
-                    }
-                }, (error) => {
-                    console.error('❌ خطأ في مستمع الأقسام:', error);
-                });
-
-            // مستمع للقنوات
-            database.collection('channels')
-                .orderBy('order')
-                .onSnapshot((snapshot) => {
-                    console.log('🔄 تحديث القنوات من Firebase');
-                    if (!snapshot.empty) {
-                        this.channels = snapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        this.saveToLocalStorage();
-                        if (this.currentSection) {
-                            this.renderChannels();
-                        }
-                    }
-                }, (error) => {
-                    console.error('❌ خطأ في مستمع القنوات:', error);
-                });
-
-        } catch (error) {
-            console.error('❌ خطأ في إعداد مستمعي Firebase:', error);
-        }
-    }
-
-    async checkForUpdates() {
-        if (this.firebaseReady) {
-            await this.loadFromFirebase();
-        } else {
-            await this.loadFromLocalStorage();
-        }
-        this.renderData();
-    }
-
     renderData() {
         this.renderSections();
-        
-        // لا تعرض أي قسم افتراضي، فقط أظهر الأقسام
-        // إذا كان هناك قسم في الرابط، سيتم عرضه عبر checkUrlForSection
-        if (!this.currentSection) {
-            this.hideChannels();
-        }
-    }
-
-    // أضف دالة جديدة لإخفاء القنوات
-    hideChannels() {
-        const container = document.getElementById('channelsContainer');
-        if (container) {
-            container.innerHTML = `
-                <div class="loading">
-                    <i class="uil uil-tv-retro"></i>
-                    <p>اختر قسمًا لعرض القنوات</p>
-                    <small>انقر على أي قسم لرؤية القنوات المتاحة</small>
-                </div>
-            `;
-        }
     }
 
     getActiveSections() {
@@ -371,12 +229,9 @@ class BeinSportApp {
         container.innerHTML = `
             <div class="sections-grid">
                 ${activeSections.map(section => {
-                    const isActive = this.currentSection?.id === section.id;
-                    
                     return `
-                        <div class="section-card ${isActive ? 'active' : ''}" 
-                             data-section-id="${section.id}">
-                            <div class="section-card-link" onclick="app.showSection('${section.id}')">
+                        <div class="section-card" data-section-id="${section.id}">
+                            <a href="section.html?sectionId=${section.id}" class="section-card-link">
                                 ${section.image ? `
                                     <div class="section-image">
                                         <img src="${section.image}" alt="${section.name}" 
@@ -390,163 +245,17 @@ class BeinSportApp {
                                 <div class="section-name">${section.name}</div>
                                 ${section.description ? `<div class="section-description">${section.description}</div>` : ''}
                                 <div class="section-badge">${this.getChannelsCount(section.id)} قناة</div>
-                            </div>
+                            </a>
                         </div>
                     `;
                 }).join('')}
             </div>
         `;
-
-        this.setupSectionEventListeners();
     }
 
     // دالة جديدة: الحصول على عدد القنوات في القسم
     getChannelsCount(sectionId) {
         return this.channels.filter(channel => channel.sectionId === sectionId).length;
-    }
-
-    setupSectionEventListeners() {
-        document.querySelectorAll('.section-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const sectionId = card.getAttribute('data-section-id');
-                console.log('🎯 نقرة على القسم:', sectionId);
-                
-                this.showSection(sectionId);
-            });
-        });
-    }
-
-    showSection(sectionId) {
-        console.log('📂 محاولة عرض القسم:', sectionId);
-        
-        const section = this.sections.find(s => s.id === sectionId);
-        if (!section) {
-            console.error('❌ القسم غير موجود:', sectionId);
-            return;
-        }
-
-        // تحديث حالة الأقسام النشطة
-        document.querySelectorAll('.section-card').forEach(card => {
-            card.classList.remove('active');
-        });
-        
-        const activeCard = document.querySelector(`[data-section-id="${sectionId}"]`);
-        if (activeCard) {
-            activeCard.classList.add('active');
-            console.log('✅ تم تفعيل البطاقة:', section.name);
-        }
-        
-        this.currentSection = section;
-        this.renderChannels();
-        
-        // تحديث URL بدون إعادة تحميل الصفحة
-        const newUrl = window.location.origin + window.location.pathname + '?section=' + sectionId;
-        window.history.pushState({ section: sectionId }, '', newUrl);
-    }
-
-    renderChannels() {
-        const container = document.getElementById('channelsContainer');
-        if (!container) {
-            console.error('❌ حاوية القنوات غير موجودة');
-            return;
-        }
-
-        if (!this.currentSection) {
-            container.innerHTML = '<div class="loading">لا توجد قنوات متاحة</div>';
-            return;
-        }
-
-        const sectionChannels = this.channels
-            .filter(channel => channel.sectionId === this.currentSection.id)
-            .sort((a, b) => (a.order || 1) - (b.order || 1));
-
-        console.log(`📺 عرض ${sectionChannels.length} قناة في قسم ${this.currentSection.name}`);
-
-        if (sectionChannels.length === 0) {
-            container.innerHTML = '<div class="loading">لا توجد قنوات في هذا القسم</div>';
-            return;
-        }
-
-        container.innerHTML = sectionChannels.map(channel => `
-            <div class="channel-card" data-channel-id="${channel.id}">
-                <div class="channel-logo">
-                    <img src="${channel.image || 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=No+Image'}" 
-                         alt="${channel.name}"
-                         onerror="this.src='https://via.placeholder.com/200x100/2F2562/FFFFFF?text=No+Image'">
-                </div>
-                <div class="channel-name">${channel.name}</div>
-            </div>
-        `).join('');
-
-        this.setupChannelEventListeners(sectionChannels);
-    }
-
-    setupChannelEventListeners(sectionChannels) {
-        document.querySelectorAll('.channel-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const channelId = card.getAttribute('data-channel-id');
-                const channel = sectionChannels.find(c => c.id === channelId);
-                if (channel) {
-                    console.log('🔗 فتح القناة:', channel.name);
-                    this.openChannel(channel);
-                }
-            });
-        });
-    }
-
-    showNoData() {
-        const container = document.getElementById('channelsContainer');
-        if (container) {
-            container.innerHTML = `
-                <div class="loading">
-                    <i class="uil uil-exclamation-triangle"></i>
-                    <p>لا توجد بيانات متاحة</p>
-                    <small>حالة Firebase: ${this.firebaseReady ? '✅ متصل' : '❌ غير متصل'}</small>
-                    <button onclick="location.reload()" class="modal-button" style="margin-top: 15px;">
-                        إعادة تحميل الصفحة
-                    </button>
-                </div>
-            `;
-        }
-    }
-
-    openChannel(channel) {
-        if (channel.url && channel.url !== '#' && channel.url.trim() !== '') {
-            try {
-                window.open(channel.url, '_blank');
-            } catch (error) {
-                console.error('❌ خطأ في فتح الرابط:', error);
-                this.showInstallModal(channel);
-            }
-        } else {
-            this.showInstallModal(channel);
-        }
-    }
-
-    showInstallModal(channel) {
-        const modal = document.getElementById('installModal');
-        if (modal) {
-            modal.style.display = "block";
-            const confirmBtn = document.getElementById('confirmInstall');
-            if (confirmBtn) {
-                confirmBtn.onclick = () => {
-                    const downloadUrl = channel.downloadUrl || channel.appUrl || 'https://play.google.com/store/apps/details?id=com.xpola.player';
-                    window.open(downloadUrl, '_blank');
-                    this.closeModal();
-                };
-            }
-        }
-    }
-
-    closeModal() {
-        const modal = document.getElementById('installModal');
-        if (modal) modal.style.display = "none";
     }
 
     setupEventListeners() {
@@ -590,56 +299,8 @@ class BeinSportApp {
         }
 
         window.addEventListener('click', (event) => {
-            if (event.target === document.getElementById('installModal')) {
-                this.closeModal();
-            }
             if (event.target === document.getElementById('loginModal')) {
                 this.hideAdminLogin();
-            }
-        });
-
-        const confirmInstall = document.getElementById('confirmInstall');
-        if (confirmInstall) {
-            confirmInstall.addEventListener('click', () => {
-                window.open('https://play.google.com/store/apps/details?id=com.xpola.player', '_blank');
-                this.closeModal();
-            });
-        }
-
-        const cancelInstall = document.getElementById('cancelInstall');
-        if (cancelInstall) {
-            cancelInstall.addEventListener('click', () => {
-                this.closeModal();
-            });
-        }
-
-        const sectionsContainer = document.getElementById('sectionsContainer');
-        if (sectionsContainer) {
-            sectionsContainer.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
-
-        const channelsContainer = document.getElementById('channelsContainer');
-        if (channelsContainer) {
-            channelsContainer.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
-
-        // إضافة مستمع لتغيير الـ URL
-        window.addEventListener('popstate', (event) => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const sectionId = urlParams.get('section');
-            
-            if (sectionId) {
-                this.showSection(sectionId);
-            } else {
-                this.hideChannels();
-                this.currentSection = null;
-                document.querySelectorAll('.section-card').forEach(card => {
-                    card.classList.remove('active');
-                });
             }
         });
     }
@@ -759,26 +420,6 @@ class BeinSportApp {
 
 // بدء التطبيق
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🏠 تهيئة التطبيق...');
+    console.log('🏠 تهيئة التطبيق الرئيسي...');
     window.app = new BeinSportApp();
-});
-
-// Fallback for emergency
-window.addEventListener('load', () => {
-    console.log('🔄 تهيئة الطوارئ...');
-    
-    const loginToggle = document.getElementById('loginToggle');
-    if (loginToggle) {
-        loginToggle.addEventListener('click', (e) => {
-            e.preventDefault();
-            const modal = document.getElementById('loginModal');
-            if (modal) modal.style.display = 'block';
-        });
-    }
-    
-    setInterval(() => {
-        if (window.app && window.app.refreshData) {
-            window.app.refreshData();
-        }
-    }, 30000);
 });
