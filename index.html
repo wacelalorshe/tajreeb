@@ -85,34 +85,6 @@
             background: linear-gradient(45deg, #FF5200, #3545FF);
         }
 
-        /* زر المزامنة */
-        .sync-toggle {
-            position: absolute;
-            left: 150px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: linear-gradient(45deg, #28a745, #20c997);
-            color: white;
-            border: none;
-            border-radius: 25px;
-            padding: 8px 15px;
-            font-size: 12px;
-            cursor: pointer;
-            z-index: 1001;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            transition: all 0.3s ease;
-            font-weight: bold;
-        }
-
-        .sync-toggle:hover {
-            transform: translateY(-50%) scale(1.05);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
-            background: linear-gradient(45deg, #20c997, #28a745);
-        }
-
         /* تحسينات إضافية للنوافذ المنبثقة */
         .login-title {
             margin-bottom: 25px;
@@ -250,35 +222,6 @@
             margin-bottom: 0;
         }
 
-        /* حالة Firebase */
-        .firebase-status {
-            position: fixed;
-            top: 150px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 10px 15px;
-            border-radius: 10px;
-            font-size: 12px;
-            z-index: 999;
-            border-left: 4px solid;
-            display: none;
-        }
-
-        .firebase-connected {
-            border-color: #28a745;
-            color: #28a745;
-        }
-
-        .firebase-disconnected {
-            border-color: #dc3545;
-            color: #dc3545;
-        }
-
-        .firebase-warning {
-            border-color: #ffc107;
-            color: #ffc107;
-        }
-
         /* تحسينات للجوال */
         @media (max-width: 768px) {
             .sections-container {
@@ -306,19 +249,6 @@
                 padding: 8px 15px;
                 font-size: 12px;
                 left: 10px;
-            }
-
-            .sync-toggle {
-                left: 120px;
-                padding: 6px 12px;
-                font-size: 11px;
-            }
-
-            .firebase-status {
-                top: 140px;
-                right: 10px;
-                font-size: 10px;
-                padding: 8px 12px;
             }
         }
 
@@ -349,19 +279,6 @@
                 font-size: 11px;
                 left: 5px;
             }
-
-            .sync-toggle {
-                left: 90px;
-                padding: 5px 10px;
-                font-size: 10px;
-            }
-
-            .firebase-status {
-                top: 130px;
-                right: 5px;
-                font-size: 9px;
-                padding: 5px 8px;
-            }
         }
     </style>
 </head>
@@ -378,11 +295,6 @@
         <button id="loginToggle" class="login-toggle">
             <i class="uil uil-signin"></i> Login
         </button>
-
-        <!-- Sync Button -->
-        <button id="syncButton" class="sync-toggle">
-            <i class="uil uil-sync"></i> Sync
-        </button>
     </header>
     
     <!-- Ticker -->
@@ -396,12 +308,6 @@
                 <li><a href="https://play.google.com/store/apps/details?id=com.xpola.player" target="_blank">شكرا لكم متابعينا الكرام</a></li>
             </ul>
         </div>
-    </div>
-
-    <!-- Firebase Status Indicator -->
-    <div id="firebaseStatus" class="firebase-status">
-        <i class="uil uil-database"></i>
-        <span id="firebaseStatusText">جاري الاتصال...</span>
     </div>
     
     <!-- Sections Navigation -->
@@ -464,9 +370,6 @@
 
     <!-- Firebase Configuration -->
     <script src="js/firebase-config.js"></script>
-    
-    <!-- Firebase Sync Manager -->
-    <script src="js/firebase-sync.js"></script>
     
     <!-- App Logic -->
     <script src="js/app.js"></script>
