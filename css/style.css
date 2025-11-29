@@ -1594,3 +1594,93 @@ header {
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
 }
+
+
+
+/* تحسينات Firebase Status */
+.firebase-status {
+    position: fixed;
+    top: 150px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 10px 15px;
+    border-radius: 10px;
+    font-size: 12px;
+    z-index: 999;
+    border-left: 4px solid;
+    display: none;
+}
+
+.firebase-connected {
+    border-color: #28a745;
+    color: #28a745;
+}
+
+.firebase-disconnected {
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.firebase-warning {
+    border-color: #ffc107;
+    color: #ffc107;
+}
+
+/* زر المزامنة */
+.sync-toggle {
+    position: absolute;
+    left: 150px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: linear-gradient(45deg, #28a745, #20c997);
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 8px 15px;
+    font-size: 12px;
+    cursor: pointer;
+    z-index: 1001;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.3s ease;
+    font-weight: bold;
+}
+
+.sync-toggle:hover {
+    transform: translateY(-50%) scale(1.05);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(45deg, #20c997, #28a745);
+}
+
+/* تحسينات للجوال */
+@media (max-width: 768px) {
+    .sync-toggle {
+        left: 120px;
+        padding: 6px 12px;
+        font-size: 11px;
+    }
+
+    .firebase-status {
+        top: 140px;
+        right: 10px;
+        font-size: 10px;
+        padding: 8px 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sync-toggle {
+        left: 90px;
+        padding: 5px 10px;
+        font-size: 10px;
+    }
+
+    .firebase-status {
+        top: 130px;
+        right: 5px;
+        font-size: 9px;
+        padding: 5px 8px;
+    }
+}
