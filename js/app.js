@@ -30,12 +30,10 @@ class BeinSportApp {
         if (firebaseTest.success) {
             this.firebaseReady = true;
             console.log('✅ Firebase جاهز للاستخدام');
-            this.updateFirebaseStatus('Firebase متصل', 'success');
         } else {
             this.firebaseReady = false;
             this.firebaseError = firebaseTest.error;
             console.warn('⚠️ Firebase غير متاح:', firebaseTest.error);
-            this.updateFirebaseStatus('Firebase غير متصل - جاري استخدام التخزين المحلي', 'error');
         }
     }
 
@@ -118,6 +116,7 @@ class BeinSportApp {
     async loadData() {
         console.log('📥 جاري تحميل البيانات...');
         
+        // محاولة التحميل من Firebase أولاً
         if (this.firebaseReady) {
             console.log('🔥 محاولة تحميل البيانات من Firebase...');
             const firebaseLoaded = await this.loadFromFirebase();
@@ -129,6 +128,7 @@ class BeinSportApp {
             }
         }
         
+        // إذا فشل Firebase، استخدم التخزين المحلي
         console.log('💾 تحميل البيانات من التخزين المحلي...');
         await this.loadFromLocalStorage();
         this.renderData();
@@ -220,210 +220,11 @@ class BeinSportApp {
         }
     }
 
-    // دوال الحفظ في Firebase
-    async saveSectionToFirebase(sectionData) {
-        const database = this.getSafeDatabase();
-        if (!database || !this.firebaseReady) {
-            console.warn('⚠️ Firebase غير متاح للحفظ، سيتم استخدام التخزين المحلي');
-            return this.saveSectionToLocalStorage(sectionData);
-        }
-
-        try {
-            let sectionId;
-            if (sectionData.id && sectionData.id.startsWith('local_')) {
-                // إنشاء مستند جديد في Firebase
-                const docRef = await database.collection('sections').add({
-                    name: sectionData.name,
-                    order: sectionData.order,
-                    isActive: sectionData.isActive,
-                    description: sectionData.description,
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                });
-                sectionId = docRef.id;
-            } else {
-                // تحديث مستند موجود
-                await database.collection('sections').doc(sectionData.id).set({
-                    ...sectionData,
-                    updatedAt: new Date()
-                }, { merge: true });
-                sectionId = sectionData.id;
-            }
-            
-            console.log('✅ تم حفظ القسم في Firebase:', sectionId);
-            return sectionId;
-        } catch (error) {
-            console.error('❌ خطأ في حفظ القسم في Firebase:', error);
-            throw error;
-        }
-    }
-
-    async saveChannelToFirebase(channelData) {
-        const database = this.getSafeDatabase();
-        if (!database || !this.firebaseReady) {
-            console.warn('⚠️ Firebase غير متاح للحفظ، سيتم استخدام التخزين المحلي');
-            return this.saveChannelToLocalStorage(channelData);
-        }
-
-        try {
-            let channelId;
-            if (channelData.id && channelData.id.startsWith('local_')) {
-                // إنشاء مستند جديد في Firebase
-                const docRef = await database.collection('channels').add({
-                    name: channelData.name,
-                    image: channelData.image,
-                    url: channelData.url,
-                    order: channelData.order,
-                    sectionId: channelData.sectionId,
-                    appUrl: channelData.appUrl,
-                    downloadUrl: channelData.downloadUrl,
-                    createdAt: new Date(),
-                    updatedAt: new Date()
-                });
-                channelId = docRef.id;
-            } else {
-                // تحديث مستند موجود
-                await database.collection('channels').doc(channelData.id).set({
-                    ...channelData,
-                    updatedAt: new Date()
-                }, { merge: true });
-                channelId = channelData.id;
-            }
-            
-            console.log('✅ تم حفظ القناة في Firebase:', channelId);
-            return channelId;
-        } catch (error) {
-            console.error('❌ خطأ في حفظ القناة في Firebase:', error);
-            throw error;
-        }
-    }
-
-    async deleteSectionFromFirebase(sectionId) {
-        const database = this.getSafeDatabase();
-        if (!database || !this.firebaseReady) {
-            console.warn('⚠️ Firebase غير متاح للحذف، سيتم الحذف محلياً فقط');
-            return this.deleteSectionFromLocalStorage(sectionId);
-        }
-
-        try {
-            await database.collection('sections').doc(sectionId).delete();
-            console.log('✅ تم حذف القسم من Firebase:', sectionId);
-            
-            // حذف القنوات المرتبطة
-            const relatedChannels = this.channels.filter(channel => channel.sectionId === sectionId);
-            for (const channel of relatedChannels) {
-                await this.deleteChannelFromFirebase(channel.id);
-            }
-            
-        } catch (error) {
-            console.error('❌ خطأ في حذف القسم من Firebase:', error);
-            throw error;
-        }
-    }
-
-    async deleteChannelFromFirebase(channelId) {
-        const database = this.getSafeDatabase();
-        if (!database || !this.firebaseReady) {
-            console.warn('⚠️ Firebase غير متاح للحذف، سيتم الحذف محلياً فقط');
-            return this.deleteChannelFromLocalStorage(channelId);
-        }
-
-        try {
-            await database.collection('channels').doc(channelId).delete();
-            console.log('✅ تم حذف القناة من Firebase:', channelId);
-        } catch (error) {
-            console.error('❌ خطأ في حذف القناة من Firebase:', error);
-            throw error;
-        }
-    }
-
-    // دوال الحفظ المحلي (كبديل)
-    saveSectionToLocalStorage(sectionData) {
-        const sectionId = sectionData.id || 'local_' + Date.now();
-        const sectionToSave = {
-            id: sectionId,
-            ...sectionData
-        };
-        
-        this.sections.push(sectionToSave);
-        this.saveToLocalStorage();
-        return sectionId;
-    }
-
-    saveChannelToLocalStorage(channelData) {
-        const channelId = channelData.id || 'local_' + Date.now();
-        const channelToSave = {
-            id: channelId,
-            ...channelData
-        };
-        
-        this.channels.push(channelToSave);
-        this.saveToLocalStorage();
-        return channelId;
-    }
-
-    deleteSectionFromLocalStorage(sectionId) {
-        this.sections = this.sections.filter(s => s.id !== sectionId);
-        this.channels = this.channels.filter(c => c.sectionId !== sectionId);
-        this.saveToLocalStorage();
-    }
-
-    deleteChannelFromLocalStorage(channelId) {
-        this.channels = this.channels.filter(c => c.id !== channelId);
-        this.saveToLocalStorage();
-    }
-
-    saveToLocalStorage() {
-        try {
-            localStorage.setItem('bein_sections', JSON.stringify(this.sections));
-            localStorage.setItem('bein_channels', JSON.stringify(this.channels));
-            console.log('💾 تم حفظ البيانات في التخزين المحلي');
-        } catch (error) {
-            console.error('❌ خطأ في حفظ البيانات محلياً:', error);
-        }
-    }
-
-    loadDefaultData() {
-        console.log('📋 استخدام البيانات الافتراضية...');
-        
-        this.sections = [{
-            id: 'default-1',
-            name: 'قنوات بي إن سبورت',
-            order: 1,
-            isActive: true
-        }];
-        
-        this.channels = [
-            {
-                id: 'default-1',
-                name: 'bein sport 1',
-                image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+1',
-                url: '#',
-                appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                order: 1,
-                sectionId: 'default-1'
-            },
-            {
-                id: 'default-2',
-                name: 'bein sport 2',
-                image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+2',
-                url: '#',
-                appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                order: 2,
-                sectionId: 'default-1'
-            }
-        ];
-        
-        this.saveToLocalStorage();
-    }
-
     setupRealTimeUpdates() {
-        // تحديث تلقائي كل 10 ثوانٍ
+        // تحديث تلقائي كل 30 ثانية للتحقق من التحديثات
         setInterval(() => {
             this.checkForUpdates();
-        }, 10000);
+        }, 30000);
 
         // الاستماع لتحديثات localStorage من التبويبات الأخرى
         window.addEventListener('storage', (e) => {
@@ -703,15 +504,6 @@ class BeinSportApp {
             });
         }
 
-        const syncButton = document.getElementById('syncButton');
-        if (syncButton) {
-            syncButton.addEventListener('click', async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                await this.syncWithFirebase();
-            });
-        }
-
         const loginButton = document.getElementById('loginButton');
         if (loginButton) {
             loginButton.addEventListener('click', (e) => {
@@ -779,24 +571,6 @@ class BeinSportApp {
         }
     }
 
-    async syncWithFirebase() {
-        console.log('🔄 بدء المزامنة مع Firebase...');
-        
-        try {
-            if (typeof firebaseSyncManager !== 'undefined') {
-                this.showAlert('جاري المزامنة مع Firebase...', 'info');
-                await firebaseSyncManager.fullSync();
-                await this.loadData();
-                this.showAlert('تمت المزامنة بنجاح', 'success');
-            } else {
-                this.showAlert('أداة المزامنة غير متاحة', 'error');
-            }
-        } catch (error) {
-            console.error('❌ فشل المزامنة:', error);
-            this.showAlert('فشل المزامنة: ' + error.message, 'error');
-        }
-    }
-
     handleLogin() {
         const email = document.getElementById('adminEmail').value;
         const password = document.getElementById('adminPassword').value;
@@ -849,49 +623,50 @@ class BeinSportApp {
         if (loginError) loginError.style.display = 'none';
     }
 
-    showAlert(message, type) {
-        const alertDiv = document.createElement('div');
-        alertDiv.style.cssText = `
-            position: fixed;
-            top: 120px;
-            right: 20px;
-            background: ${type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#17a2b8'};
-            color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            z-index: 10000;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            font-weight: bold;
-        `;
-        alertDiv.textContent = message;
-        
-        document.body.appendChild(alertDiv);
-        
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.remove();
-            }
-        }, 3000);
+    saveToLocalStorage() {
+        try {
+            localStorage.setItem('bein_sections', JSON.stringify(this.sections));
+            localStorage.setItem('bein_channels', JSON.stringify(this.channels));
+            console.log('💾 تم حفظ البيانات في التخزين المحلي');
+        } catch (error) {
+            console.error('❌ خطأ في حفظ البيانات محلياً:', error);
+        }
     }
 
-    updateFirebaseStatus(message, type) {
-        const statusElement = document.getElementById('firebaseStatus');
-        const statusText = document.getElementById('firebaseStatusText');
+    loadDefaultData() {
+        console.log('📋 استخدام البيانات الافتراضية...');
         
-        if (statusElement && statusText) {
-            statusElement.style.display = 'block';
-            statusText.textContent = message;
-            
-            statusElement.classList.remove('firebase-connected', 'firebase-disconnected', 'firebase-warning');
-            
-            if (type === 'success') {
-                statusElement.classList.add('firebase-connected');
-            } else if (type === 'error') {
-                statusElement.classList.add('firebase-disconnected');
-            } else if (type === 'warning') {
-                statusElement.classList.add('firebase-warning');
+        this.sections = [{
+            id: 'default-1',
+            name: 'قنوات بي إن سبورت',
+            order: 1,
+            isActive: true
+        }];
+        
+        this.channels = [
+            {
+                id: 'default-1',
+                name: 'bein sport 1',
+                image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+1',
+                url: '#',
+                appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                order: 1,
+                sectionId: 'default-1'
+            },
+            {
+                id: 'default-2',
+                name: 'bein sport 2',
+                image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+2',
+                url: '#',
+                appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                order: 2,
+                sectionId: 'default-1'
             }
-        }
+        ];
+        
+        this.saveToLocalStorage();
     }
 
     refreshData() {
@@ -923,5 +698,5 @@ window.addEventListener('load', () => {
         if (window.app && window.app.refreshData) {
             window.app.refreshData();
         }
-    }, 15000);
+    }, 30000);
 });
