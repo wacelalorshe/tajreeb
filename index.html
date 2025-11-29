@@ -222,6 +222,29 @@
             margin-bottom: 0;
         }
 
+        /* حالة Firebase */
+        .firebase-status {
+            position: fixed;
+            top: 150px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 12px;
+            z-index: 999;
+            border-left: 4px solid;
+        }
+
+        .firebase-connected {
+            border-color: #28a745;
+            color: #28a745;
+        }
+
+        .firebase-disconnected {
+            border-color: #dc3545;
+            color: #dc3545;
+        }
+
         /* تحسينات للجوال */
         @media (max-width: 768px) {
             .sections-container {
@@ -249,6 +272,13 @@
                 padding: 8px 15px;
                 font-size: 12px;
                 left: 10px;
+            }
+
+            .firebase-status {
+                top: 140px;
+                right: 10px;
+                font-size: 10px;
+                padding: 8px 12px;
             }
         }
 
@@ -279,6 +309,13 @@
                 font-size: 11px;
                 left: 5px;
             }
+
+            .firebase-status {
+                top: 130px;
+                right: 5px;
+                font-size: 9px;
+                padding: 5px 8px;
+            }
         }
     </style>
 </head>
@@ -308,6 +345,12 @@
                 <li><a href="https://play.google.com/store/apps/details?id=com.xpola.player" target="_blank">شكرا لكم متابعينا الكرام</a></li>
             </ul>
         </div>
+    </div>
+
+    <!-- Firebase Status Indicator -->
+    <div id="firebaseStatus" class="firebase-status" style="display: none;">
+        <i class="uil uil-database"></i>
+        <span id="firebaseStatusText">جاري الاتصال...</span>
     </div>
     
     <!-- Sections Navigation -->
@@ -364,672 +407,1097 @@
     </div>
 
     <!-- Firebase SDK - MUST BE LOADED FIRST -->
-    <!-- Firebase SDK - MUST BE LOADED FIRST -->
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
-<!-- App Config - LOAD SECOND -->
-<script src="js/firebase-config.js"></script>
+    <!-- App Config - LOAD SECOND -->
+    <script>
+        // Firebase configuration with comprehensive error handling
+        const firebaseConfig = {
+            apiKey: "AIzaSyAkgEiYYlmpMe0NLewulheovlTQMz5C980",
+            authDomain: "bein-42f9e.firebaseapp.com",
+            projectId: "bein-42f9e",
+            storageBucket: "bein-42f9e.firebasestorage.app",
+            messagingSenderId: "143741167050",
+            appId: "1:143741167050:web:922d3a0cddb40f67b21b33",
+            measurementId: "G-JH198SKCFS"
+        };
 
-<!-- App Logic - LOAD LAST -->
-<script>
-    // تطبيق Bein Sport - الإصدار المحسن مع إصلاح Firebase
-    class BeinSportApp {
-        constructor() {
-            this.sections = [];
-            this.channels = [];
-            this.currentSection = null;
-            this.firebaseReady = false;
-            this.init();
-        }
+        // Global variables for Firebase services
+        let app = null;
+        let db = null;
+        let auth = null;
+        let firebaseInitialized = false;
 
-        async init() {
-            console.log('🚀 بدء تشغيل تطبيق Bein Sport...');
-            
-            document.getElementById('currentYear').textContent = new Date().getFullYear();
-            this.setupEventListeners();
-            
-            // انتظار تهيئة Firebase
-            await this.waitForFirebase();
-            
-            await this.loadData();
-            this.setupRealTimeUpdates();
-            
-            console.log('✅ تم تهيئة التطبيق بنجاح');
-        }
-
-        async waitForFirebase() {
-            console.log('⏳ انتظار تهيئة Firebase...');
-            
-            let attempts = 0;
-            const maxAttempts = 30; // 30 محاولة خلال 6 ثواني
-            
-            return new Promise((resolve) => {
-                const checkFirebase = () => {
-                    attempts++;
-                    
-                    if (typeof db !== 'undefined' && db !== null) {
-                        console.log('✅ Firebase جاهز بعد', attempts, 'محاولة');
-                        this.firebaseReady = true;
-                        resolve(true);
-                        return;
-                    }
-                    
-                    if (attempts >= maxAttempts) {
-                        console.warn('⚠️ Firebase غير متاح بعد', maxAttempts, 'محاولة - استخدام التخزين المحلي');
-                        this.firebaseReady = false;
-                        resolve(false);
-                        return;
-                    }
-                    
-                    setTimeout(checkFirebase, 200); // محاولة كل 200 مللي ثانية
-                };
-                
-                checkFirebase();
-            });
-        }
-
-        async loadData() {
-            console.log('📥 جاري تحميل البيانات...');
-            
-            // حاول تحميل البيانات من Firebase أولاً
-            const firebaseLoaded = await this.loadFromFirebase();
-            
-            if (!firebaseLoaded) {
-                // إذا فشل Firebase، استخدم البيانات المحلية
-                await this.loadFromLocalStorage();
-            }
-            
-            this.renderData();
-        }
-
-        async loadFromFirebase() {
-            if (!this.firebaseReady || typeof db === 'undefined') {
-                console.log('⚠️ Firebase غير متاح - تخطي التحميل من Firebase');
-                return false;
-            }
-
+        // Enhanced Firebase initialization
+        function initializeFirebase() {
             try {
-                console.log('🔥 جاري تحميل البيانات من Firebase...');
-
-                // تحميل الأقسام من Firebase
-                const sectionsSnapshot = await db.collection('sections')
-                    .where('isActive', '==', true)
-                    .orderBy('order')
-                    .get();
-
-                let firebaseDataLoaded = false;
-
-                if (!sectionsSnapshot.empty) {
-                    this.sections = sectionsSnapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                    console.log(`✅ تم تحميل ${this.sections.length} قسم من Firebase`);
-                    firebaseDataLoaded = true;
-                    
-                    // حفظ في localStorage
-                    localStorage.setItem('bein_sections', JSON.stringify(this.sections));
-                } else {
-                    console.log('ℹ️ لا توجد أقسام في Firebase');
-                }
-
-                // تحميل القنوات من Firebase
-                const channelsSnapshot = await db.collection('channels')
-                    .orderBy('order')
-                    .get();
-
-                if (!channelsSnapshot.empty) {
-                    this.channels = channelsSnapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                    console.log(`✅ تم تحميل ${this.channels.length} قناة من Firebase`);
-                    firebaseDataLoaded = true;
-                    
-                    // حفظ في localStorage
-                    localStorage.setItem('bein_channels', JSON.stringify(this.channels));
-                } else {
-                    console.log('ℹ️ لا توجد قنوات في Firebase');
-                }
-
-                return firebaseDataLoaded;
-
-            } catch (error) {
-                console.error('❌ خطأ في تحميل البيانات من Firebase:', error);
+                console.group('🚀 Firebase Initialization');
                 
-                // تقديم رسائل خطأ محددة
-                if (error.code === 'permission-denied') {
-                    console.error('🔐 خطأ في الصلاحيات - تحقق من قواعد Firestore');
-                } else if (error.code === 'unavailable') {
-                    console.error('🌐 Firebase غير متاح - تحقق من اتصال الإنترنت');
+                // Check if Firebase SDK is properly loaded
+                if (typeof firebase === 'undefined') {
+                    console.error('❌ Firebase SDK is not loaded');
+                    updateFirebaseStatus('Firebase SDK غير محمل', 'error');
+                    throw new Error('Firebase SDK لم يتم تحميله. تحقق من اتصال الإنترنت.');
                 }
-                
-                return false;
-            }
-        }
 
-        async loadFromLocalStorage() {
-            console.log('💾 جاري تحميل البيانات من التخزين المحلي...');
-            
-            try {
-                const savedSections = localStorage.getItem('bein_sections');
-                const savedChannels = localStorage.getItem('bein_channels');
-                
-                if (savedSections) {
-                    this.sections = JSON.parse(savedSections);
-                    console.log(`✅ تم تحميل ${this.sections.length} قسم من localStorage`);
-                }
-                
-                if (savedChannels) {
-                    this.channels = JSON.parse(savedChannels);
-                    console.log(`✅ تم تحميل ${this.channels.length} قناة من localStorage`);
-                }
-                
-                // إذا لم توجد بيانات محلية، استخدم البيانات الافتراضية
-                if (this.sections.length === 0 && this.channels.length === 0) {
-                    this.loadDefaultData();
-                }
-            } catch (error) {
-                console.error('❌ خطأ في تحميل البيانات المحلية:', error);
-                this.loadDefaultData();
-            }
-        }
+                console.log('✅ Firebase SDK is loaded');
 
-        loadDefaultData() {
-            console.log('📋 استخدام البيانات الافتراضية...');
-            
-            this.sections = [{
-                id: 'default-1',
-                name: 'قنوات بي إن سبورت',
-                order: 1,
-                isActive: true
-            }];
-            
-            this.channels = [
-                {
-                    id: 'default-1',
-                    name: 'bein sport 1',
-                    image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+1',
-                    url: '#',
-                    appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                    downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                    order: 1,
-                    sectionId: 'default-1'
-                },
-                {
-                    id: 'default-2',
-                    name: 'bein sport 2',
-                    image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+2',
-                    url: '#',
-                    appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                    downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                    order: 2,
-                    sectionId: 'default-1'
-                }
-            ];
-            
-            // حفظ البيانات الافتراضية في localStorage
-            this.saveToLocalStorage();
-        }
-
-        saveToLocalStorage() {
-            try {
-                localStorage.setItem('bein_sections', JSON.stringify(this.sections));
-                localStorage.setItem('bein_channels', JSON.stringify(this.channels));
-                console.log('💾 تم حفظ البيانات في التخزين المحلي');
-            } catch (error) {
-                console.error('❌ خطأ في حفظ البيانات محلياً:', error);
-            }
-        }
-
-        setupRealTimeUpdates() {
-            // تحديث تلقائي كل 5 ثوانٍ
-            setInterval(() => {
-                this.checkForUpdates();
-            }, 5000);
-
-            // الاستماع لتحديثات localStorage من التبويبات الأخرى
-            window.addEventListener('storage', (e) => {
-                if (e.key === 'bein_sections' || e.key === 'bein_channels') {
-                    console.log('🔄 تم تحديث البيانات من تبويب آخر');
-                    this.loadFromLocalStorage();
-                    this.renderData();
-                }
-            });
-
-            // إعداد مستمعي Firebase اللحظيين إذا كان متاحاً
-            if (this.firebaseReady && typeof db !== 'undefined') {
-                this.setupFirebaseListeners();
-            }
-        }
-
-        setupFirebaseListeners() {
-            try {
-                console.log('👂 جاري إعداد مستمعي Firebase...');
-
-                // مستمع للأقسام
-                db.collection('sections')
-                    .where('isActive', '==', true)
-                    .orderBy('order')
-                    .onSnapshot((snapshot) => {
-                        console.log('🔄 تحديث الأقسام من Firebase');
-                        if (!snapshot.empty) {
-                            this.sections = snapshot.docs.map(doc => ({
-                                id: doc.id,
-                                ...doc.data()
-                            }));
-                            this.saveToLocalStorage();
-                            this.renderSections();
-                        }
-                    }, (error) => {
-                        console.error('❌ خطأ في مستمع الأقسام:', error);
-                    });
-
-                // مستمع للقنوات
-                db.collection('channels')
-                    .orderBy('order')
-                    .onSnapshot((snapshot) => {
-                        console.log('🔄 تحديث القنوات من Firebase');
-                        if (!snapshot.empty) {
-                            this.channels = snapshot.docs.map(doc => ({
-                                id: doc.id,
-                                ...doc.data()
-                            }));
-                            this.saveToLocalStorage();
-                            if (this.currentSection) {
-                                this.renderChannels();
-                            }
-                        }
-                    }, (error) => {
-                        console.error('❌ خطأ في مستمع القنوات:', error);
-                    });
-
-            } catch (error) {
-                console.error('❌ خطأ في إعداد مستمعي Firebase:', error);
-            }
-        }
-
-        async checkForUpdates() {
-            if (this.firebaseReady) {
-                await this.loadFromFirebase();
-                this.renderData();
-            } else {
-                await this.loadFromLocalStorage();
-                this.renderData();
-            }
-        }
-
-        renderData() {
-            this.renderSections();
-            
-            const activeSections = this.getActiveSections();
-            if (activeSections.length > 0) {
-                if (!this.currentSection || !activeSections.find(s => s.id === this.currentSection.id)) {
-                    this.showSection(activeSections[0].id);
-                } else {
-                    this.renderChannels();
-                }
-            } else {
-                this.showNoData();
-            }
-        }
-
-        getActiveSections() {
-            return this.sections
-                .filter(section => section.isActive !== false)
-                .sort((a, b) => (a.order || 1) - (b.order || 1));
-        }
-
-        renderSections() {
-            const container = document.getElementById('sectionsContainer');
-            if (!container) {
-                console.error('❌ حاوية الأقسام غير موجودة');
-                return;
-            }
-
-            const activeSections = this.getActiveSections();
-            
-            if (activeSections.length === 0) {
-                container.innerHTML = '';
-                return;
-            }
-
-            container.innerHTML = activeSections.map(section => `
-                <div class="section-tab ${this.currentSection?.id === section.id ? 'active' : ''}" 
-                     data-section-id="${section.id}">
-                    ${section.name}
-                </div>
-            `).join('');
-
-            // إضافة event listeners للأقسام
-            this.setupSectionEventListeners();
-        }
-
-        setupSectionEventListeners() {
-            const sectionTabs = document.querySelectorAll('.section-tab');
-            
-            sectionTabs.forEach(tab => {
-                // إزالة أي event listeners سابقة لمنع التكرار
-                const newTab = tab.cloneNode(true);
-                tab.parentNode.replaceChild(newTab, tab);
-            });
-
-            // إضافة event listeners جديدة
-            document.querySelectorAll('.section-tab').forEach(tab => {
-                tab.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const sectionId = tab.getAttribute('data-section-id');
-                    console.log('🎯 نقرة على القسم:', sectionId);
-                    this.showSection(sectionId);
-                });
-            });
-        }
-
-        showSection(sectionId) {
-            console.log('📂 محاولة عرض القسم:', sectionId);
-            
-            // العثور على القسم
-            const section = this.sections.find(s => s.id === sectionId);
-            if (!section) {
-                console.error('❌ القسم غير موجود:', sectionId);
-                return;
-            }
-
-            // تحديث التبويب النشط
-            document.querySelectorAll('.section-tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            const activeTab = document.querySelector(`[data-section-id="${sectionId}"]`);
-            if (activeTab) {
-                activeTab.classList.add('active');
-                console.log('✅ تم تفعيل التبويب:', section.name);
-            }
-            
-            this.currentSection = section;
-            this.renderChannels();
-        }
-
-        renderChannels() {
-            const container = document.getElementById('channelsContainer');
-            if (!container) {
-                console.error('❌ حاوية القنوات غير موجودة');
-                return;
-            }
-
-            if (!this.currentSection) {
-                container.innerHTML = '<div class="loading">لا توجد قنوات متاحة</div>';
-                return;
-            }
-
-            const sectionChannels = this.channels
-                .filter(channel => channel.sectionId === this.currentSection.id)
-                .sort((a, b) => (a.order || 1) - (b.order || 1));
-
-            console.log(`📺 عرض ${sectionChannels.length} قناة في قسم ${this.currentSection.name}`);
-
-            if (sectionChannels.length === 0) {
-                container.innerHTML = '<div class="loading">لا توجد قنوات في هذا القسم</div>';
-                return;
-            }
-
-            container.innerHTML = sectionChannels.map(channel => `
-                <div class="channel-card" data-channel-id="${channel.id}">
-                    <div class="channel-logo">
-                        <img src="${channel.image || 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=No+Image'}" 
-                             alt="${channel.name}"
-                             onerror="this.src='https://via.placeholder.com/200x100/2F2562/FFFFFF?text=No+Image'">
-                    </div>
-                    <div class="channel-name">${channel.name}</div>
-                </div>
-            `).join('');
-
-            // إضافة event listeners للقنوات
-            this.setupChannelEventListeners(sectionChannels);
-        }
-
-        setupChannelEventListeners(sectionChannels) {
-            document.querySelectorAll('.channel-card').forEach(card => {
-                card.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const channelId = card.getAttribute('data-channel-id');
-                    const channel = sectionChannels.find(c => c.id === channelId);
-                    if (channel) {
-                        console.log('🔗 فتح القناة:', channel.name);
-                        this.openChannel(channel);
-                    }
-                });
-            });
-        }
-
-        showNoData() {
-            const container = document.getElementById('channelsContainer');
-            if (container) {
-                container.innerHTML = `
-                    <div class="loading">
-                        <i class="uil uil-exclamation-triangle"></i>
-                        <p>لا توجد بيانات متاحة</p>
-                        <button onclick="location.reload()" class="modal-button" style="margin-top: 15px;">
-                            إعادة تحميل الصفحة
-                        </button>
-                    </div>
-                `;
-            }
-        }
-
-        openChannel(channel) {
-            if (channel.url && channel.url !== '#' && channel.url.trim() !== '') {
+                // Initialize Firebase app
                 try {
-                    window.open(channel.url, '_blank');
-                } catch (error) {
-                    console.error('❌ خطأ في فتح الرابط:', error);
-                    this.showInstallModal(channel);
+                    if (!firebase.apps.length) {
+                        app = firebase.initializeApp(firebaseConfig);
+                        console.log('✅ New Firebase app initialized');
+                    } else {
+                        app = firebase.app();
+                        console.log('✅ Using existing Firebase app');
+                    }
+                } catch (appError) {
+                    console.error('❌ Firebase app initialization failed:', appError);
+                    updateFirebaseStatus('فشل تهيئة Firebase', 'error');
+                    throw appError;
                 }
-            } else {
-                this.showInstallModal(channel);
+
+                // Initialize Firestore with error handling
+                try {
+                    if (typeof firebase.firestore === 'undefined') {
+                        throw new Error('Firestore is not available');
+                    }
+                    
+                    db = firebase.firestore();
+                    console.log('✅ Firestore service initialized');
+                    
+                    // Configure Firestore settings
+                    if (db) {
+                        db.settings({
+                            timestampsInSnapshots: true,
+                            ignoreUndefinedProperties: true
+                        });
+                    }
+                } catch (firestoreError) {
+                    console.error('❌ Firestore initialization failed:', firestoreError);
+                    db = null;
+                }
+
+                // Initialize Authentication
+                try {
+                    if (typeof firebase.auth === 'undefined') {
+                        throw new Error('Authentication is not available');
+                    }
+                    
+                    auth = firebase.auth();
+                    console.log('✅ Authentication service initialized');
+                } catch (authError) {
+                    console.error('❌ Authentication initialization failed:', authError);
+                    auth = null;
+                }
+
+                // Mark as initialized
+                firebaseInitialized = true;
+                console.log('🎉 Firebase initialized successfully');
+                updateFirebaseStatus('Firebase متصل', 'success');
+                console.groupEnd();
+
+                return { 
+                    success: true, 
+                    app: app, 
+                    db: db, 
+                    auth: auth 
+                };
+
+            } catch (error) {
+                console.error('💥 Firebase initialization failed:', error);
+                updateFirebaseStatus('فشل اتصال Firebase', 'error');
+                console.groupEnd();
+                
+                return { 
+                    success: false, 
+                    app: null, 
+                    db: null, 
+                    auth: null,
+                    error: error.message 
+                };
             }
         }
 
-        showInstallModal(channel) {
-            const modal = document.getElementById('installModal');
-            if (modal) {
-                modal.style.display = "block";
-                const confirmBtn = document.getElementById('confirmInstall');
-                if (confirmBtn) {
-                    confirmBtn.onclick = () => {
-                        const downloadUrl = channel.downloadUrl || channel.appUrl || 'https://play.google.com/store/apps/details?id=com.xpola.player';
-                        window.open(downloadUrl, '_blank');
-                        this.closeModal();
+        // Update Firebase status indicator
+        function updateFirebaseStatus(message, type) {
+            const statusElement = document.getElementById('firebaseStatus');
+            const statusText = document.getElementById('firebaseStatusText');
+            
+            if (statusElement && statusText) {
+                statusElement.style.display = 'block';
+                statusText.textContent = message;
+                
+                // Remove previous classes
+                statusElement.classList.remove('firebase-connected', 'firebase-disconnected');
+                
+                // Add appropriate class
+                if (type === 'success') {
+                    statusElement.classList.add('firebase-connected');
+                } else if (type === 'error') {
+                    statusElement.classList.add('firebase-disconnected');
+                }
+            }
+        }
+
+        // Safe database access function
+        function getDatabase() {
+            if (!db) {
+                console.warn('⚠️ Database is not available. Initializing Firebase...');
+                const result = initializeFirebase();
+                return result.db;
+            }
+            return db;
+        }
+
+        // Test Firebase connection
+        async function testFirebaseConnection() {
+            const database = getDatabase();
+            
+            if (!database) {
+                console.error('❌ Database is not available for connection test');
+                updateFirebaseStatus('قاعدة البيانات غير متاحة', 'error');
+                return { success: false, error: 'Database not available' };
+            }
+
+            try {
+                console.log('🧪 Testing Firebase connection...');
+                updateFirebaseStatus('جاري اختبار الاتصال...', 'success');
+                
+                const testDoc = database.collection('connection_test').doc('test');
+                await testDoc.set({
+                    timestamp: new Date(),
+                    message: 'Testing Firebase connection',
+                    status: 'success'
+                });
+                
+                // Read it back to verify
+                const doc = await testDoc.get();
+                if (doc.exists) {
+                    console.log('✅ Firebase connection test successful');
+                    updateFirebaseStatus('Firebase متصل', 'success');
+                    
+                    // Clean up test document
+                    await testDoc.delete();
+                    
+                    return { success: true };
+                } else {
+                    console.error('❌ Test document was not created');
+                    updateFirebaseStatus('فشل اختبار الاتصال', 'error');
+                    return { success: false, error: 'Test document not found' };
+                }
+            } catch (error) {
+                console.error('❌ Firebase connection test failed:', error);
+                updateFirebaseStatus('فشل اتصال Firebase', 'error');
+                
+                let errorMessage = error.message;
+                if (error.code) {
+                    errorMessage = `Error ${error.code}: ${error.message}`;
+                }
+                
+                return { 
+                    success: false, 
+                    error: errorMessage,
+                    code: error.code 
+                };
+            }
+        }
+
+        // Initialize Firebase immediately
+        console.log('🔧 Starting Firebase initialization...');
+        const initResult = initializeFirebase();
+
+        // Make services globally available with safety checks
+        window.firebaseApp = app;
+        window.firebaseDb = db;
+        window.firebaseAuth = auth;
+        window.firebaseInitialized = firebaseInitialized;
+
+        // Safe global access functions
+        window.getFirebaseDb = getDatabase;
+        window.testFirebase = testFirebaseConnection;
+
+        // Auto-test connection
+        setTimeout(() => {
+            if (db) {
+                testFirebaseConnection().then(result => {
+                    if (result.success) {
+                        console.log('🎉 Firebase is working perfectly!');
+                    } else {
+                        console.warn('⚠️ Firebase has issues:', result.error);
+                    }
+                });
+            } else {
+                console.warn('⚠️ Firebase not initialized - using local storage only');
+                updateFirebaseStatus('جاري استخدام التخزين المحلي', 'error');
+            }
+        }, 3000);
+    </script>
+    
+    <!-- App Logic - LOAD LAST -->
+    <script>
+        // تطبيق Bein Sport - الإصدار المحصن ضد أخطاء Firebase
+        class BeinSportApp {
+            constructor() {
+                this.sections = [];
+                this.channels = [];
+                this.currentSection = null;
+                this.firebaseReady = false;
+                this.firebaseError = null;
+                this.init();
+            }
+
+            async init() {
+                console.log('🚀 بدء تشغيل تطبيق Bein Sport...');
+                
+                // تهيئة السنة الحالية
+                document.getElementById('currentYear').textContent = new Date().getFullYear();
+                
+                // إعداد مستمعي الأحداث أولاً
+                this.setupEventListeners();
+                
+                // تهيئة Firebase والبيانات
+                await this.initializeFirebase();
+                await this.loadData();
+                
+                // إعداد التحديثات التلقائية
+                this.setupRealTimeUpdates();
+                
+                console.log('✅ تم تهيئة التطبيق بنجاح');
+            }
+
+            async initializeFirebase() {
+                console.log('🔥 جاري تهيئة Firebase...');
+                
+                // الانتظار حتى يتم تحميل Firebase SDK
+                await this.waitForFirebaseSDK();
+                
+                // اختبار اتصال Firebase
+                const firebaseTest = await this.testFirebaseConnection();
+                
+                if (firebaseTest.success) {
+                    this.firebaseReady = true;
+                    console.log('✅ Firebase جاهز للاستخدام');
+                } else {
+                    this.firebaseReady = false;
+                    this.firebaseError = firebaseTest.error;
+                    console.warn('⚠️ Firebase غير متاح:', firebaseTest.error);
+                    console.log('📋 سيتم استخدام التخزين المحلي فقط');
+                }
+            }
+
+            async waitForFirebaseSDK() {
+                return new Promise((resolve) => {
+                    let attempts = 0;
+                    const maxAttempts = 50; // 10 ثواني كحد أقصى
+                    
+                    const checkFirebase = () => {
+                        attempts++;
+                        
+                        if (typeof firebase !== 'undefined') {
+                            console.log('✅ Firebase SDK محمل بعد', attempts, 'محاولة');
+                            resolve(true);
+                            return;
+                        }
+                        
+                        if (attempts >= maxAttempts) {
+                            console.warn('⚠️ Firebase SDK لم يتم تحميله بعد', maxAttempts, 'محاولة');
+                            resolve(false);
+                            return;
+                        }
+                        
+                        setTimeout(checkFirebase, 200);
+                    };
+                    
+                    checkFirebase();
+                });
+            }
+
+            async testFirebaseConnection() {
+                if (typeof db === 'undefined' || db === null) {
+                    return { success: false, error: 'Firestore غير مهيأ' };
+                }
+
+                try {
+                    console.log('🧪 اختبار اتصال Firebase...');
+                    
+                    // استخدام الدالة الآمنة للوصول إلى قاعدة البيانات
+                    const database = this.getSafeDatabase();
+                    if (!database) {
+                        return { success: false, error: 'قاعدة البيانات غير متاحة' };
+                    }
+                    
+                    const testDoc = database.collection('connection_test').doc('test');
+                    await testDoc.set({
+                        timestamp: new Date(),
+                        test: true,
+                        app: 'Bein Sport'
+                    });
+                    
+                    await testDoc.delete();
+                    
+                    return { success: true };
+                } catch (error) {
+                    console.error('❌ فشل اختبار اتصال Firebase:', error);
+                    return { 
+                        success: false, 
+                        error: error.message,
+                        code: error.code 
                     };
                 }
             }
+
+            getSafeDatabase() {
+                // محاولة استخدام db العالمي أولاً
+                if (typeof db !== 'undefined' && db !== null) {
+                    return db;
+                }
+                
+                // محاولة استخدام الدالة الآمنة من الإعدادات
+                if (typeof getFirebaseDb === 'function') {
+                    return getFirebaseDb();
+                }
+                
+                // محاولة إعادة التهيئة
+                if (typeof initializeFirebase === 'function') {
+                    const result = initializeFirebase();
+                    return result.db;
+                }
+                
+                console.error('❌ لا يمكن الوصول إلى قاعدة البيانات');
+                return null;
+            }
+
+            async loadData() {
+                console.log('📥 جاري تحميل البيانات...');
+                
+                if (this.firebaseReady) {
+                    console.log('🔥 محاولة تحميل البيانات من Firebase...');
+                    const firebaseLoaded = await this.loadFromFirebase();
+                    
+                    if (firebaseLoaded) {
+                        console.log('✅ تم تحميل البيانات من Firebase');
+                        this.renderData();
+                        return;
+                    }
+                }
+                
+                // إذا فشل Firebase، استخدم التخزين المحلي
+                console.log('💾 تحميل البيانات من التخزين المحلي...');
+                await this.loadFromLocalStorage();
+                this.renderData();
+            }
+
+            async loadFromFirebase() {
+                const database = this.getSafeDatabase();
+                if (!database) {
+                    console.log('❌ قاعدة البيانات غير متاحة لتحميل البيانات');
+                    return false;
+                }
+
+                try {
+                    console.log('📡 جاري جلب البيانات من Firebase...');
+                    
+                    // تحميل الأقسام
+                    const sectionsSnapshot = await database.collection('sections')
+                        .where('isActive', '==', true)
+                        .orderBy('order')
+                        .get();
+
+                    if (!sectionsSnapshot.empty) {
+                        this.sections = sectionsSnapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        console.log(`✅ تم تحميل ${this.sections.length} قسم من Firebase`);
+                        
+                        // حفظ في localStorage
+                        localStorage.setItem('bein_sections', JSON.stringify(this.sections));
+                    } else {
+                        console.log('ℹ️ لا توجد أقسام في Firebase');
+                    return false;
+                    }
+
+                    // تحميل القنوات
+                    const channelsSnapshot = await database.collection('channels')
+                        .orderBy('order')
+                        .get();
+
+                    if (!channelsSnapshot.empty) {
+                        this.channels = channelsSnapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        console.log(`✅ تم تحميل ${this.channels.length} قناة من Firebase`);
+                        
+                        // حفظ في localStorage
+                        localStorage.setItem('bein_channels', JSON.stringify(this.channels));
+                    } else {
+                        console.log('ℹ️ لا توجد قنوات في Firebase');
+                        return false;
+                    }
+
+                    return true;
+
+                } catch (error) {
+                    console.error('❌ خطأ في تحميل البيانات من Firebase:', error);
+                    
+                    // تقديم رسائل خطأ مفصلة
+                    if (error.code === 'permission-denied') {
+                        console.error('🔐 خطأ في الصلاحيات - يرجى التحقق من قواعد Firestore');
+                    } else if (error.code === 'unavailable') {
+                        console.error('🌐 Firebase غير متاح - تحقق من اتصال الإنترنت');
+                    } else {
+                        console.error('💥 خطأ غير متوقع:', error.message);
+                    }
+                    
+                    return false;
+                }
+            }
+
+            async loadFromLocalStorage() {
+                try {
+                    const savedSections = localStorage.getItem('bein_sections');
+                    const savedChannels = localStorage.getItem('bein_channels');
+                    
+                    if (savedSections) {
+                        this.sections = JSON.parse(savedSections);
+                        console.log(`✅ تم تحميل ${this.sections.length} قسم من localStorage`);
+                    }
+                    
+                    if (savedChannels) {
+                        this.channels = JSON.parse(savedChannels);
+                        console.log(`✅ تم تحميل ${this.channels.length} قناة من localStorage`);
+                    }
+                    
+                    // إذا لم توجد بيانات، استخدم البيانات الافتراضية
+                    if (this.sections.length === 0 && this.channels.length === 0) {
+                        this.loadDefaultData();
+                    }
+                } catch (error) {
+                    console.error('❌ خطأ في تحميل البيانات المحلية:', error);
+                    this.loadDefaultData();
+                }
+            }
+
+            loadDefaultData() {
+                console.log('📋 استخدام البيانات الافتراضية...');
+                
+                this.sections = [{
+                    id: 'default-1',
+                    name: 'قنوات بي إن سبورت',
+                    order: 1,
+                    isActive: true
+                }];
+                
+                this.channels = [
+                    {
+                        id: 'default-1',
+                        name: 'bein sport 1',
+                        image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+1',
+                        url: '#',
+                        appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                        downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                        order: 1,
+                        sectionId: 'default-1'
+                    },
+                    {
+                        id: 'default-2',
+                        name: 'bein sport 2',
+                        image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+2',
+                        url: '#',
+                        appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                        downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                        order: 2,
+                        sectionId: 'default-1'
+                    }
+                ];
+                
+                this.saveToLocalStorage();
+            }
+
+            saveToLocalStorage() {
+                try {
+                    localStorage.setItem('bein_sections', JSON.stringify(this.sections));
+                    localStorage.setItem('bein_channels', JSON.stringify(this.channels));
+                    console.log('💾 تم حفظ البيانات في التخزين المحلي');
+                } catch (error) {
+                    console.error('❌ خطأ في حفظ البيانات محلياً:', error);
+                }
+            }
+
+            setupRealTimeUpdates() {
+                // تحديث تلقائي كل 10 ثوانٍ
+                setInterval(() => {
+                    this.checkForUpdates();
+                }, 10000);
+
+                // الاستماع لتحديثات localStorage من التبويبات الأخرى
+                window.addEventListener('storage', (e) => {
+                    if (e.key === 'bein_sections' || e.key === 'bein_channels') {
+                        console.log('🔄 تم تحديث البيانات من تبويب آخر');
+                        this.loadFromLocalStorage();
+                        this.renderData();
+                    }
+                });
+
+                // إعداد مستمعي Firebase إذا كان متاحاً
+                if (this.firebaseReady) {
+                    this.setupFirebaseListeners();
+                }
+            }
+
+            setupFirebaseListeners() {
+                const database = this.getSafeDatabase();
+                if (!database) {
+                    console.log('❌ لا يمكن إعداد مستمعي Firebase - قاعدة البيانات غير متاحة');
+                    return;
+                }
+
+                try {
+                    console.log('👂 جاري إعداد مستمعي Firebase...');
+
+                    // مستمع للأقسام
+                    database.collection('sections')
+                        .where('isActive', '==', true)
+                        .orderBy('order')
+                        .onSnapshot((snapshot) => {
+                            console.log('🔄 تحديث الأقسام من Firebase');
+                            if (!snapshot.empty) {
+                                this.sections = snapshot.docs.map(doc => ({
+                                    id: doc.id,
+                                    ...doc.data()
+                                }));
+                                this.saveToLocalStorage();
+                                this.renderSections();
+                            }
+                        }, (error) => {
+                            console.error('❌ خطأ في مستمع الأقسام:', error);
+                        });
+
+                    // مستمع للقنوات
+                    database.collection('channels')
+                        .orderBy('order')
+                        .onSnapshot((snapshot) => {
+                            console.log('🔄 تحديث القنوات من Firebase');
+                            if (!snapshot.empty) {
+                                this.channels = snapshot.docs.map(doc => ({
+                                    id: doc.id,
+                                    ...doc.data()
+                                }));
+                                this.saveToLocalStorage();
+                                if (this.currentSection) {
+                                    this.renderChannels();
+                                }
+                            }
+                        }, (error) => {
+                            console.error('❌ خطأ في مستمع القنوات:', error);
+                        });
+
+                } catch (error) {
+                    console.error('❌ خطأ في إعداد مستمعي Firebase:', error);
+                }
+            }
+
+            async checkForUpdates() {
+                if (this.firebaseReady) {
+                    await this.loadFromFirebase();
+                } else {
+                    await this.loadFromLocalStorage();
+                }
+                this.renderData();
+            }
+
+            renderData() {
+                this.renderSections();
+                
+                const activeSections = this.getActiveSections();
+                if (activeSections.length > 0) {
+                    if (!this.currentSection || !activeSections.find(s => s.id === this.currentSection.id)) {
+                        this.showSection(activeSections[0].id);
+                    } else {
+                        this.renderChannels();
+                    }
+                } else {
+                    this.showNoData();
+                }
+            }
+
+            getActiveSections() {
+                return this.sections
+                    .filter(section => section.isActive !== false)
+                    .sort((a, b) => (a.order || 1) - (b.order || 1));
+            }
+
+            renderSections() {
+                const container = document.getElementById('sectionsContainer');
+                if (!container) {
+                    console.error('❌ حاوية الأقسام غير موجودة');
+                    return;
+                }
+
+                const activeSections = this.getActiveSections();
+                
+                if (activeSections.length === 0) {
+                    container.innerHTML = '';
+                    return;
+                }
+
+                container.innerHTML = activeSections.map(section => `
+                    <div class="section-tab ${this.currentSection?.id === section.id ? 'active' : ''}" 
+                         data-section-id="${section.id}">
+                        ${section.name}
+                    </div>
+                `).join('');
+
+                this.setupSectionEventListeners();
+            }
+
+            setupSectionEventListeners() {
+                const sectionTabs = document.querySelectorAll('.section-tab');
+                
+                sectionTabs.forEach(tab => {
+                    const newTab = tab.cloneNode(true);
+                    tab.parentNode.replaceChild(newTab, tab);
+                });
+
+                document.querySelectorAll('.section-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const sectionId = tab.getAttribute('data-section-id');
+                        console.log('🎯 نقرة على القسم:', sectionId);
+                        this.showSection(sectionId);
+                    });
+                });
+            }
+
+            showSection(sectionId) {
+                console.log('📂 محاولة عرض القسم:', sectionId);
+                
+                const section = this.sections.find(s => s.id === sectionId);
+                if (!section) {
+                    console.error('❌ القسم غير موجود:', sectionId);
+                    return;
+                }
+
+                document.querySelectorAll('.section-tab').forEach(tab => {
+                    tab.classList.remove('active');
+                });
+                
+                const activeTab = document.querySelector(`[data-section-id="${sectionId}"]`);
+                if (activeTab) {
+                    activeTab.classList.add('active');
+                    console.log('✅ تم تفعيل التبويب:', section.name);
+                }
+                
+                this.currentSection = section;
+                this.renderChannels();
+            }
+
+            renderChannels() {
+                const container = document.getElementById('channelsContainer');
+                if (!container) {
+                    console.error('❌ حاوية القنوات غير موجودة');
+                    return;
+                }
+
+                if (!this.currentSection) {
+                    container.innerHTML = '<div class="loading">لا توجد قنوات متاحة</div>';
+                    return;
+                }
+
+                const sectionChannels = this.channels
+                    .filter(channel => channel.sectionId === this.currentSection.id)
+                    .sort((a, b) => (a.order || 1) - (b.order || 1));
+
+                console.log(`📺 عرض ${sectionChannels.length} قناة في قسم ${this.currentSection.name}`);
+
+                if (sectionChannels.length === 0) {
+                    container.innerHTML = '<div class="loading">لا توجد قنوات في هذا القسم</div>';
+                    return;
+                }
+
+                container.innerHTML = sectionChannels.map(channel => `
+                    <div class="channel-card" data-channel-id="${channel.id}">
+                        <div class="channel-logo">
+                            <img src="${channel.image || 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=No+Image'}" 
+                                 alt="${channel.name}"
+                                 onerror="this.src='https://via.placeholder.com/200x100/2F2562/FFFFFF?text=No+Image'">
+                        </div>
+                        <div class="channel-name">${channel.name}</div>
+                    </div>
+                `).join('');
+
+                this.setupChannelEventListeners(sectionChannels);
+            }
+
+            setupChannelEventListeners(sectionChannels) {
+                document.querySelectorAll('.channel-card').forEach(card => {
+                    card.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const channelId = card.getAttribute('data-channel-id');
+                        const channel = sectionChannels.find(c => c.id === channelId);
+                        if (channel) {
+                            console.log('🔗 فتح القناة:', channel.name);
+                            this.openChannel(channel);
+                        }
+                    });
+                });
+            }
+
+            showNoData() {
+                const container = document.getElementById('channelsContainer');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="loading">
+                            <i class="uil uil-exclamation-triangle"></i>
+                            <p>لا توجد بيانات متاحة</p>
+                            <small>حالة Firebase: ${this.firebaseReady ? '✅ متصل' : '❌ غير متصل'}</small>
+                            <button onclick="location.reload()" class="modal-button" style="margin-top: 15px;">
+                                إعادة تحميل الصفحة
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+
+            openChannel(channel) {
+                if (channel.url && channel.url !== '#' && channel.url.trim() !== '') {
+                    try {
+                        window.open(channel.url, '_blank');
+                    } catch (error) {
+                        console.error('❌ خطأ في فتح الرابط:', error);
+                        this.showInstallModal(channel);
+                    }
+                } else {
+                    this.showInstallModal(channel);
+                }
+            }
+
+            showInstallModal(channel) {
+                const modal = document.getElementById('installModal');
+                if (modal) {
+                    modal.style.display = "block";
+                    const confirmBtn = document.getElementById('confirmInstall');
+                    if (confirmBtn) {
+                        confirmBtn.onclick = () => {
+                            const downloadUrl = channel.downloadUrl || channel.appUrl || 'https://play.google.com/store/apps/details?id=com.xpola.player';
+                            window.open(downloadUrl, '_blank');
+                            this.closeModal();
+                        };
+                    }
+                }
+            }
+
+            closeModal() {
+                const modal = document.getElementById('installModal');
+                if (modal) modal.style.display = "none";
+            }
+
+            setupEventListeners() {
+                console.log('🔧 إعداد مستمعي الأحداث...');
+                
+                const loginToggle = document.getElementById('loginToggle');
+                if (loginToggle) {
+                    loginToggle.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.showAdminLogin();
+                    });
+                }
+
+                const loginButton = document.getElementById('loginButton');
+                if (loginButton) {
+                    loginButton.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.handleLogin();
+                    });
+                }
+
+                const cancelLogin = document.getElementById('cancelLogin');
+                if (cancelLogin) {
+                    cancelLogin.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.hideAdminLogin();
+                    });
+                }
+
+                const adminPassword = document.getElementById('adminPassword');
+                if (adminPassword) {
+                    adminPassword.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            this.handleLogin();
+                        }
+                    });
+                }
+
+                window.addEventListener('click', (event) => {
+                    if (event.target === document.getElementById('installModal')) {
+                        this.closeModal();
+                    }
+                    if (event.target === document.getElementById('loginModal')) {
+                        this.hideAdminLogin();
+                    }
+                });
+
+                const confirmInstall = document.getElementById('confirmInstall');
+                if (confirmInstall) {
+                    confirmInstall.addEventListener('click', () => {
+                        window.open('https://play.google.com/store/apps/details?id=com.xpola.player', '_blank');
+                        this.closeModal();
+                    });
+                }
+
+                const cancelInstall = document.getElementById('cancelInstall');
+                if (cancelInstall) {
+                    cancelInstall.addEventListener('click', () => {
+                        this.closeModal();
+                    });
+                }
+
+                const sectionsContainer = document.getElementById('sectionsContainer');
+                if (sectionsContainer) {
+                    sectionsContainer.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                    });
+                }
+
+                const channelsContainer = document.getElementById('channelsContainer');
+                if (channelsContainer) {
+                    channelsContainer.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                    });
+                }
+            }
+
+            handleLogin() {
+                const email = document.getElementById('adminEmail').value;
+                const password = document.getElementById('adminPassword').value;
+                
+                if (!email || !password) {
+                    this.showLoginError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
+                    return;
+                }
+                
+                if (password === "Ww735981122" && email === "admin@aseeltv.com") {
+                    localStorage.setItem('adminAuth', 'true');
+                    localStorage.setItem('adminEmail', email);
+                    this.hideAdminLogin();
+                    window.location.href = 'admin.html';
+                } else {
+                    this.showLoginError('كلمة المرور غير صحيحة');
+                }
+            }
+
+            showAdminLogin() {
+                const modal = document.getElementById('loginModal');
+                if (modal) {
+                    modal.style.display = 'block';
+                    setTimeout(() => {
+                        const passwordField = document.getElementById('adminPassword');
+                        if (passwordField) passwordField.focus();
+                    }, 100);
+                }
+            }
+
+            hideAdminLogin() {
+                const modal = document.getElementById('loginModal');
+                if (modal) {
+                    modal.style.display = 'none';
+                    document.getElementById('adminPassword').value = '';
+                    this.hideLoginError();
+                }
+            }
+
+            showLoginError(message) {
+                const loginError = document.getElementById('loginError');
+                if (loginError) {
+                    loginError.textContent = message;
+                    loginError.style.display = 'block';
+                }
+            }
+
+            hideLoginError() {
+                const loginError = document.getElementById('loginError');
+                if (loginError) loginError.style.display = 'none';
+            }
+
+            refreshData() {
+                console.log('🔄 تحديث يدوي للبيانات');
+                this.loadData();
+            }
         }
 
-        closeModal() {
-            const modal = document.getElementById('installModal');
-            if (modal) modal.style.display = "none";
-        }
+        // بدء التطبيق
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🏠 تهيئة التطبيق...');
+            window.app = new BeinSportApp();
+        });
 
-        setupEventListeners() {
-            console.log('🔧 إعداد مستمعي الأحداث...');
+        // Fallback for emergency
+        window.addEventListener('load', () => {
+            console.log('🔄 تهيئة الطوارئ...');
             
-            // زر تسجيل الدخول
+            // تأكد من أن event listeners الأساسية تعمل
             const loginToggle = document.getElementById('loginToggle');
             if (loginToggle) {
                 loginToggle.addEventListener('click', (e) => {
                     e.preventDefault();
-                    e.stopPropagation();
-                    this.showAdminLogin();
+                    const modal = document.getElementById('loginModal');
+                    if (modal) modal.style.display = 'block';
                 });
-            }
-
-            // زر الدخول في النافذة المنبثقة
-            const loginButton = document.getElementById('loginButton');
-            if (loginButton) {
-                loginButton.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.handleLogin();
-                });
-            }
-
-            // إلغاء الدخول
-            const cancelLogin = document.getElementById('cancelLogin');
-            if (cancelLogin) {
-                cancelLogin.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.hideAdminLogin();
-                });
-            }
-
-            // زر Enter في حقل كلمة المرور
-            const adminPassword = document.getElementById('adminPassword');
-            if (adminPassword) {
-                adminPassword.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        this.handleLogin();
-                    }
-                });
-            }
-
-            // إغلاق النوافذ بالنقر خارجها
-            window.addEventListener('click', (event) => {
-                if (event.target === document.getElementById('installModal')) {
-                    this.closeModal();
-                }
-                if (event.target === document.getElementById('loginModal')) {
-                    this.hideAdminLogin();
-                }
-            });
-
-            // زر تأكيد التحميل
-            const confirmInstall = document.getElementById('confirmInstall');
-            if (confirmInstall) {
-                confirmInstall.addEventListener('click', () => {
-                    window.open('https://play.google.com/store/apps/details?id=com.xpola.player', '_blank');
-                    this.closeModal();
-                });
-            }
-
-            // زر إلغاء التحميل
-            const cancelInstall = document.getElementById('cancelInstall');
-            if (cancelInstall) {
-                cancelInstall.addEventListener('click', () => {
-                    this.closeModal();
-                });
-            }
-
-            // منع انتشار الأحداث في الحاويات
-            const sectionsContainer = document.getElementById('sectionsContainer');
-            if (sectionsContainer) {
-                sectionsContainer.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                });
-            }
-
-            const channelsContainer = document.getElementById('channelsContainer');
-            if (channelsContainer) {
-                channelsContainer.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                });
-            }
-        }
-
-        handleLogin() {
-            const email = document.getElementById('adminEmail').value;
-            const password = document.getElementById('adminPassword').value;
-            
-            if (!email || !password) {
-                this.showLoginError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
-                return;
             }
             
-            if (password === "Ww735981122" && email === "admin@aseeltv.com") {
-                localStorage.setItem('adminAuth', 'true');
-                localStorage.setItem('adminEmail', email);
-                this.hideAdminLogin();
-                window.location.href = 'admin.html';
-            } else {
-                this.showLoginError('كلمة المرور غير صحيحة');
-            }
+            // تحديث تلقائي احتياطي
+            setInterval(() => {
+                if (window.app && window.app.refreshData) {
+                    window.app.refreshData();
+                }
+            }, 15000);
+        });
+    </script>
+
+    <!-- أدوات التصحيح -->
+    <script>
+        // أداة تشخيص متقدمة لـ Firebase
+        console.log('🔧 أدوات تشخيص Firebase المتقدمة مفعلة');
+
+        // فحص شامل لـ Firebase
+        function comprehensiveFirebaseCheck() {
+            console.group('🔍 فحص شامل لـ Firebase');
+            
+            // فحص SDK
+            console.log('📦 Firebase SDK:', typeof firebase !== 'undefined' ? '✅ محمل' : '❌ غير محمل');
+            
+            // فحص الخدمات
+            console.log('🔄 Firebase App:', typeof app !== 'undefined' && app !== null ? '✅ مهيأ' : '❌ غير مهيأ');
+            console.log('🗄️ Firestore:', typeof db !== 'undefined' && db !== null ? '✅ متاح' : '❌ غير متاح');
+            console.log('🔐 Authentication:', typeof auth !== 'undefined' && auth !== null ? '✅ متاح' : '❌ غير متاح');
+            
+            // فحص التهيئة
+            console.log('⚙️ تم التهيئة:', window.firebaseInitialized ? '✅ نعم' : '❌ لا');
+            
+            // فحص التطبيق
+            console.log('🎯 حالة التطبيق:', window.app ? '✅ محمل' : '❌ غير محمل');
+            console.log('🔥 جاهزية Firebase:', window.app?.firebaseReady ? '✅ جاهز' : '❌ غير جاهز');
+            
+            console.groupEnd();
         }
 
-        showAdminLogin() {
-            const modal = document.getElementById('loginModal');
-            if (modal) {
-                modal.style.display = 'block';
-                // تركيز على حقل كلمة المرور
+        // إصلاح Firebase
+        async function repairFirebase() {
+            console.group('🔧 إصلاح Firebase');
+            
+            try {
+                // إعادة تحميل SDK
+                console.log('🔄 إعادة تحميل Firebase SDK...');
+                
+                // إعادة تحميل scripts
+                const scripts = [
+                    'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js',
+                    'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js',
+                    'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js'
+                ];
+                
+                for (const src of scripts) {
+                    const script = document.createElement('script');
+                    script.src = src;
+                    document.head.appendChild(script);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                console.log('✅ تم إعادة تحميل SDK');
+                
+                // انتظار التهيئة
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // إعادة تحميل الإعدادات
+                const configScript = document.createElement('script');
+                configScript.src = 'js/firebase-config.js';
+                document.head.appendChild(configScript);
+                
+                console.log('✅ تم إعادة تحميل الإعدادات');
+                
+                // إعادة تحميل التطبيق بعد 3 ثوان
                 setTimeout(() => {
-                    const passwordField = document.getElementById('adminPassword');
-                    if (passwordField) passwordField.focus();
-                }, 100);
+                    console.log('🔄 إعادة تحميل التطبيق...');
+                    if (window.app && window.app.refreshData) {
+                        window.app.refreshData();
+                    }
+                }, 3000);
+                
+            } catch (error) {
+                console.error('❌ فشل إصلاح Firebase:', error);
             }
+            
+            console.groupEnd();
         }
 
-        hideAdminLogin() {
-            const modal = document.getElementById('loginModal');
-            if (modal) {
-                modal.style.display = 'none';
-                document.getElementById('adminPassword').value = '';
-                this.hideLoginError();
+        // اختبار اتصال يدوي
+        async function manualConnectionTest() {
+            console.group('🧪 اختبار اتصال يدوي');
+            
+            try {
+                if (typeof db === 'undefined' || db === null) {
+                    console.error('❌ Firestore غير متاح');
+                    return false;
+                }
+                
+                console.log('📡 اختبار الكتابة في Firestore...');
+                const testDoc = db.collection('manual_test').doc('connection');
+                
+                await testDoc.set({
+                    timestamp: new Date(),
+                    test: 'manual_connection_test',
+                    status: 'testing'
+                });
+                
+                console.log('✅ تمت الكتابة بنجاح');
+                
+                console.log('📖 اختبار القراءة من Firestore...');
+                const doc = await testDoc.get();
+                
+                if (doc.exists) {
+                    console.log('✅ تمت القراءة بنجاح');
+                    console.log('📊 البيانات:', doc.data());
+                } else {
+                    console.error('❌ فشل القراءة - المستند غير موجود');
+                }
+                
+                // تنظيف
+                await testDoc.delete();
+                console.log('🧹 تم تنظيف بيانات الاختبار');
+                
+                return true;
+                
+            } catch (error) {
+                console.error('❌ فشل اختبار الاتصال:', error);
+                console.error('🔍 تفاصيل الخطأ:', error.code, error.message);
+                return false;
             }
+            
+            console.groupEnd();
         }
 
-        showLoginError(message) {
-            const loginError = document.getElementById('loginError');
-            if (loginError) {
-                loginError.textContent = message;
-                loginError.style.display = 'block';
-            }
-        }
+        // جعل الدوال متاحة globally
+        window.comprehensiveFirebaseCheck = comprehensiveFirebaseCheck;
+        window.repairFirebase = repairFirebase;
+        window.manualConnectionTest = manualConnectionTest;
 
-        hideLoginError() {
-            const loginError = document.getElementById('loginError');
-            if (loginError) loginError.style.display = 'none';
-        }
-
-        // دالة مساعدة للتحديث اليدوي
-        refreshData() {
-            console.log('🔄 تحديث يدوي للبيانات');
-            this.loadData();
-        }
-    }
-
-    // بدء التطبيق
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('🏠 تهيئة التطبيق...');
-        window.app = new BeinSportApp();
-    });
-
-    // Fallback for emergency
-    window.addEventListener('load', () => {
-        console.log('🔄 تهيئة الطوارئ...');
-        
-        // تأكد من أن event listeners الأساسية تعمل
-        const loginToggle = document.getElementById('loginToggle');
-        if (loginToggle) {
-            loginToggle.addEventListener('click', (e) => {
-                e.preventDefault();
-                const modal = document.getElementById('loginModal');
-                if (modal) modal.style.display = 'block';
-            });
-        }
-        
-        // تحديث تلقائي احتياطي
-        setInterval(() => {
-            if (window.app && window.app.refreshData) {
-                window.app.refreshData();
-            }
-        }, 10000);
-    });
-</script>
+        // فحص تلقائي
+        setTimeout(() => {
+            console.log('🔍 فحص تلقائي لـ Firebase...');
+            comprehensiveFirebaseCheck();
+        }, 4000);
+    </script>
 </body>
 </html>
