@@ -364,592 +364,672 @@
     </div>
 
     <!-- Firebase SDK - MUST BE LOADED FIRST -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <!-- Firebase SDK - MUST BE LOADED FIRST -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
-    <!-- App Config - LOAD SECOND -->
-    <script src="js/firebase-config.js"></script>
-    
-    <!-- App Logic - LOAD LAST -->
-    <script>
-        // تطبيق Bein Sport - الإصدار النهائي بدون أخطاء
-        class BeinSportApp {
-            constructor() {
-                this.sections = [];
-                this.channels = [];
-                this.currentSection = null;
-                this.init();
-            }
+<!-- App Config - LOAD SECOND -->
+<script src="js/firebase-config.js"></script>
 
-            async init() {
-                console.log('🚀 بدء تشغيل تطبيق Bein Sport...');
-                
-                document.getElementById('currentYear').textContent = new Date().getFullYear();
-                this.setupEventListeners();
-                await this.loadData();
-                this.setupRealTimeUpdates();
-                
-                console.log('✅ تم تهيئة التطبيق بنجاح');
-            }
+<!-- App Logic - LOAD LAST -->
+<script>
+    // تطبيق Bein Sport - الإصدار المحسن مع إصلاح Firebase
+    class BeinSportApp {
+        constructor() {
+            this.sections = [];
+            this.channels = [];
+            this.currentSection = null;
+            this.firebaseReady = false;
+            this.init();
+        }
 
-            async loadData() {
-                console.log('📥 جاري تحميل البيانات...');
-                
-                await this.loadFromLocalStorage();
-                await this.loadFromFirebase();
-                this.renderData();
-            }
+        async init() {
+            console.log('🚀 بدء تشغيل تطبيق Bein Sport...');
+            
+            document.getElementById('currentYear').textContent = new Date().getFullYear();
+            this.setupEventListeners();
+            
+            // انتظار تهيئة Firebase
+            await this.waitForFirebase();
+            
+            await this.loadData();
+            this.setupRealTimeUpdates();
+            
+            console.log('✅ تم تهيئة التطبيق بنجاح');
+        }
 
-            async loadFromLocalStorage() {
-                try {
-                    const savedSections = localStorage.getItem('bein_sections');
-                    const savedChannels = localStorage.getItem('bein_channels');
+        async waitForFirebase() {
+            console.log('⏳ انتظار تهيئة Firebase...');
+            
+            let attempts = 0;
+            const maxAttempts = 30; // 30 محاولة خلال 6 ثواني
+            
+            return new Promise((resolve) => {
+                const checkFirebase = () => {
+                    attempts++;
                     
-                    if (savedSections) {
-                        this.sections = JSON.parse(savedSections);
-                        console.log(`✅ تم تحميل ${this.sections.length} قسم من localStorage`);
+                    if (typeof db !== 'undefined' && db !== null) {
+                        console.log('✅ Firebase جاهز بعد', attempts, 'محاولة');
+                        this.firebaseReady = true;
+                        resolve(true);
+                        return;
                     }
                     
-                    if (savedChannels) {
-                        this.channels = JSON.parse(savedChannels);
-                        console.log(`✅ تم تحميل ${this.channels.length} قناة من localStorage`);
+                    if (attempts >= maxAttempts) {
+                        console.warn('⚠️ Firebase غير متاح بعد', maxAttempts, 'محاولة - استخدام التخزين المحلي');
+                        this.firebaseReady = false;
+                        resolve(false);
+                        return;
                     }
-                } catch (error) {
-                    console.error('❌ خطأ في تحميل البيانات من localStorage:', error);
-                }
-            }
+                    
+                    setTimeout(checkFirebase, 200); // محاولة كل 200 مللي ثانية
+                };
+                
+                checkFirebase();
+            });
+        }
 
-            async loadFromFirebase() {
-                if (typeof db === 'undefined') {
-                    console.log('⚠️ Firebase غير متاح');
-                    return;
-                }
-
-                try {
-                    // تحميل الأقسام من Firebase
-                    const sectionsSnapshot = await db.collection('sections')
-                        .where('isActive', '==', true)
-                        .orderBy('order')
-                        .get();
-
-                    if (!sectionsSnapshot.empty) {
-                        this.sections = sectionsSnapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        console.log(`✅ تم تحميل ${this.sections.length} قسم من Firebase`);
-                        localStorage.setItem('bein_sections', JSON.stringify(this.sections));
-                    }
-
-                    // تحميل القنوات من Firebase
-                    const channelsSnapshot = await db.collection('channels')
-                        .orderBy('order')
-                        .get();
-
-                    if (!channelsSnapshot.empty) {
-                        this.channels = channelsSnapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        }));
-                        console.log(`✅ تم تحميل ${this.channels.length} قناة من Firebase`);
-                        localStorage.setItem('bein_channels', JSON.stringify(this.channels));
-                    }
-                } catch (error) {
-                    console.error('❌ خطأ في تحميل البيانات من Firebase:', error);
-                }
-            }
-
-            setupRealTimeUpdates() {
-                // تحديث تلقائي كل 3 ثوانٍ
-                setInterval(() => {
-                    this.checkForUpdates();
-                }, 3000);
-
-                // الاستماع لتحديثات localStorage من التبويبات الأخرى
-                window.addEventListener('storage', (e) => {
-                    if (e.key === 'bein_sections' || e.key === 'bein_channels') {
-                        console.log('🔄 تم تحديث البيانات من تبويب آخر');
-                        this.loadFromLocalStorage();
-                        this.renderData();
-                    }
-                });
-
-                // إعداد مستمعي Firebase اللحظيين إذا كان متاحاً
-                if (typeof db !== 'undefined') {
-                    this.setupFirebaseListeners();
-                }
-            }
-
-            setupFirebaseListeners() {
-                try {
-                    // مستمع للأقسام
-                    db.collection('sections')
-                        .where('isActive', '==', true)
-                        .orderBy('order')
-                        .onSnapshot((snapshot) => {
-                            console.log('🔄 تحديث الأقسام من Firebase');
-                            if (!snapshot.empty) {
-                                this.sections = snapshot.docs.map(doc => ({
-                                    id: doc.id,
-                                    ...doc.data()
-                                }));
-                                localStorage.setItem('bein_sections', JSON.stringify(this.sections));
-                                this.renderSections();
-                            }
-                        });
-
-                    // مستمع للقنوات
-                    db.collection('channels')
-                        .orderBy('order')
-                        .onSnapshot((snapshot) => {
-                            console.log('🔄 تحديث القنوات من Firebase');
-                            if (!snapshot.empty) {
-                                this.channels = snapshot.docs.map(doc => ({
-                                    id: doc.id,
-                                    ...doc.data()
-                                }));
-                                localStorage.setItem('bein_channels', JSON.stringify(this.channels));
-                                if (this.currentSection) {
-                                    this.renderChannels();
-                                }
-                            }
-                        });
-                } catch (error) {
-                    console.error('❌ خطأ في إعداد مستمعي Firebase:', error);
-                }
-            }
-
-            async checkForUpdates() {
+        async loadData() {
+            console.log('📥 جاري تحميل البيانات...');
+            
+            // حاول تحميل البيانات من Firebase أولاً
+            const firebaseLoaded = await this.loadFromFirebase();
+            
+            if (!firebaseLoaded) {
+                // إذا فشل Firebase، استخدم البيانات المحلية
                 await this.loadFromLocalStorage();
-                this.renderData();
+            }
+            
+            this.renderData();
+        }
+
+        async loadFromFirebase() {
+            if (!this.firebaseReady || typeof db === 'undefined') {
+                console.log('⚠️ Firebase غير متاح - تخطي التحميل من Firebase');
+                return false;
             }
 
-            renderData() {
-                this.renderSections();
-                
-                const activeSections = this.getActiveSections();
-                if (activeSections.length > 0) {
-                    if (!this.currentSection || !activeSections.find(s => s.id === this.currentSection.id)) {
-                        this.showSection(activeSections[0].id);
-                    } else {
-                        this.renderChannels();
-                    }
+            try {
+                console.log('🔥 جاري تحميل البيانات من Firebase...');
+
+                // تحميل الأقسام من Firebase
+                const sectionsSnapshot = await db.collection('sections')
+                    .where('isActive', '==', true)
+                    .orderBy('order')
+                    .get();
+
+                let firebaseDataLoaded = false;
+
+                if (!sectionsSnapshot.empty) {
+                    this.sections = sectionsSnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    console.log(`✅ تم تحميل ${this.sections.length} قسم من Firebase`);
+                    firebaseDataLoaded = true;
+                    
+                    // حفظ في localStorage
+                    localStorage.setItem('bein_sections', JSON.stringify(this.sections));
                 } else {
-                    this.showNoData();
-                }
-            }
-
-            getActiveSections() {
-                return this.sections
-                    .filter(section => section.isActive !== false)
-                    .sort((a, b) => (a.order || 1) - (b.order || 1));
-            }
-
-            renderSections() {
-                const container = document.getElementById('sectionsContainer');
-                if (!container) {
-                    console.error('❌ حاوية الأقسام غير موجودة');
-                    return;
+                    console.log('ℹ️ لا توجد أقسام في Firebase');
                 }
 
-                const activeSections = this.getActiveSections();
-                
-                if (activeSections.length === 0) {
-                    container.innerHTML = '';
-                    return;
-                }
+                // تحميل القنوات من Firebase
+                const channelsSnapshot = await db.collection('channels')
+                    .orderBy('order')
+                    .get();
 
-                container.innerHTML = activeSections.map(section => `
-                    <div class="section-tab ${this.currentSection?.id === section.id ? 'active' : ''}" 
-                         data-section-id="${section.id}">
-                        ${section.name}
-                    </div>
-                `).join('');
-
-                // إضافة event listeners للأقسام
-                this.setupSectionEventListeners();
-            }
-
-            setupSectionEventListeners() {
-                const sectionTabs = document.querySelectorAll('.section-tab');
-                
-                sectionTabs.forEach(tab => {
-                    // إزالة أي event listeners سابقة لمنع التكرار
-                    const newTab = tab.cloneNode(true);
-                    tab.parentNode.replaceChild(newTab, tab);
-                });
-
-                // إضافة event listeners جديدة
-                document.querySelectorAll('.section-tab').forEach(tab => {
-                    tab.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        const sectionId = tab.getAttribute('data-section-id');
-                        console.log('🎯 نقرة على القسم:', sectionId);
-                        this.showSection(sectionId);
-                    });
-                });
-            }
-
-            showSection(sectionId) {
-                console.log('📂 محاولة عرض القسم:', sectionId);
-                
-                // العثور على القسم
-                const section = this.sections.find(s => s.id === sectionId);
-                if (!section) {
-                    console.error('❌ القسم غير موجود:', sectionId);
-                    return;
-                }
-
-                // تحديث التبويب النشط
-                document.querySelectorAll('.section-tab').forEach(tab => {
-                    tab.classList.remove('active');
-                });
-                
-                const activeTab = document.querySelector(`[data-section-id="${sectionId}"]`);
-                if (activeTab) {
-                    activeTab.classList.add('active');
-                    console.log('✅ تم تفعيل التبويب:', section.name);
-                }
-                
-                this.currentSection = section;
-                this.renderChannels();
-            }
-
-            renderChannels() {
-                const container = document.getElementById('channelsContainer');
-                if (!container) {
-                    console.error('❌ حاوية القنوات غير موجودة');
-                    return;
-                }
-
-                if (!this.currentSection) {
-                    container.innerHTML = '<div class="loading">لا توجد قنوات متاحة</div>';
-                    return;
-                }
-
-                const sectionChannels = this.channels
-                    .filter(channel => channel.sectionId === this.currentSection.id)
-                    .sort((a, b) => (a.order || 1) - (b.order || 1));
-
-                console.log(`📺 عرض ${sectionChannels.length} قناة في قسم ${this.currentSection.name}`);
-
-                if (sectionChannels.length === 0) {
-                    container.innerHTML = '<div class="loading">لا توجد قنوات في هذا القسم</div>';
-                    return;
-                }
-
-                container.innerHTML = sectionChannels.map(channel => `
-                    <div class="channel-card" data-channel-id="${channel.id}">
-                        <div class="channel-logo">
-                            <img src="${channel.image || 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=No+Image'}" 
-                                 alt="${channel.name}"
-                                 onerror="this.src='https://via.placeholder.com/200x100/2F2562/FFFFFF?text=No+Image'">
-                        </div>
-                        <div class="channel-name">${channel.name}</div>
-                    </div>
-                `).join('');
-
-                // إضافة event listeners للقنوات
-                this.setupChannelEventListeners(sectionChannels);
-            }
-
-            setupChannelEventListeners(sectionChannels) {
-                document.querySelectorAll('.channel-card').forEach(card => {
-                    card.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        const channelId = card.getAttribute('data-channel-id');
-                        const channel = sectionChannels.find(c => c.id === channelId);
-                        if (channel) {
-                            console.log('🔗 فتح القناة:', channel.name);
-                            this.openChannel(channel);
-                        }
-                    });
-                });
-            }
-
-            showNoData() {
-                const container = document.getElementById('channelsContainer');
-                if (container) {
-                    container.innerHTML = `
-                        <div class="loading">
-                            <i class="uil uil-exclamation-triangle"></i>
-                            <p>لا توجد بيانات متاحة</p>
-                            <button onclick="location.reload()" class="modal-button" style="margin-top: 15px;">
-                                إعادة تحميل الصفحة
-                            </button>
-                        </div>
-                    `;
-                }
-            }
-
-            openChannel(channel) {
-                if (channel.url && channel.url !== '#' && channel.url.trim() !== '') {
-                    try {
-                        window.open(channel.url, '_blank');
-                    } catch (error) {
-                        console.error('❌ خطأ في فتح الرابط:', error);
-                        this.showInstallModal(channel);
-                    }
+                if (!channelsSnapshot.empty) {
+                    this.channels = channelsSnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    console.log(`✅ تم تحميل ${this.channels.length} قناة من Firebase`);
+                    firebaseDataLoaded = true;
+                    
+                    // حفظ في localStorage
+                    localStorage.setItem('bein_channels', JSON.stringify(this.channels));
                 } else {
-                    this.showInstallModal(channel);
+                    console.log('ℹ️ لا توجد قنوات في Firebase');
                 }
-            }
 
-            showInstallModal(channel) {
-                const modal = document.getElementById('installModal');
-                if (modal) {
-                    modal.style.display = "block";
-                    const confirmBtn = document.getElementById('confirmInstall');
-                    if (confirmBtn) {
-                        confirmBtn.onclick = () => {
-                            const downloadUrl = channel.downloadUrl || channel.appUrl || 'https://play.google.com/store/apps/details?id=com.xpola.player';
-                            window.open(downloadUrl, '_blank');
-                            this.closeModal();
-                        };
-                    }
-                }
-            }
+                return firebaseDataLoaded;
 
-            closeModal() {
-                const modal = document.getElementById('installModal');
-                if (modal) modal.style.display = "none";
-            }
-
-            setupEventListeners() {
-                console.log('🔧 إعداد مستمعي الأحداث...');
+            } catch (error) {
+                console.error('❌ خطأ في تحميل البيانات من Firebase:', error);
                 
-                // زر تسجيل الدخول
-                const loginToggle = document.getElementById('loginToggle');
-                if (loginToggle) {
-                    loginToggle.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.showAdminLogin();
-                    });
-                }
-
-                // زر الدخول في النافذة المنبثقة
-                const loginButton = document.getElementById('loginButton');
-                if (loginButton) {
-                    loginButton.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.handleLogin();
-                    });
-                }
-
-                // إلغاء الدخول
-                const cancelLogin = document.getElementById('cancelLogin');
-                if (cancelLogin) {
-                    cancelLogin.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.hideAdminLogin();
-                    });
-                }
-
-                // زر Enter في حقل كلمة المرور
-                const adminPassword = document.getElementById('adminPassword');
-                if (adminPassword) {
-                    adminPassword.addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            this.handleLogin();
-                        }
-                    });
-                }
-
-                // إغلاق النوافذ بالنقر خارجها
-                window.addEventListener('click', (event) => {
-                    if (event.target === document.getElementById('installModal')) {
-                        this.closeModal();
-                    }
-                    if (event.target === document.getElementById('loginModal')) {
-                        this.hideAdminLogin();
-                    }
-                });
-
-                // زر تأكيد التحميل
-                const confirmInstall = document.getElementById('confirmInstall');
-                if (confirmInstall) {
-                    confirmInstall.addEventListener('click', () => {
-                        window.open('https://play.google.com/store/apps/details?id=com.xpola.player', '_blank');
-                        this.closeModal();
-                    });
-                }
-
-                // زر إلغاء التحميل
-                const cancelInstall = document.getElementById('cancelInstall');
-                if (cancelInstall) {
-                    cancelInstall.addEventListener('click', () => {
-                        this.closeModal();
-                    });
-                }
-
-                // منع انتشار الأحداث في الحاويات
-                const sectionsContainer = document.getElementById('sectionsContainer');
-                if (sectionsContainer) {
-                    sectionsContainer.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                    });
-                }
-
-                const channelsContainer = document.getElementById('channelsContainer');
-                if (channelsContainer) {
-                    channelsContainer.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                    });
-                }
-            }
-
-            handleLogin() {
-                const email = document.getElementById('adminEmail').value;
-                const password = document.getElementById('adminPassword').value;
-                
-                if (!email || !password) {
-                    this.showLoginError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
-                    return;
+                // تقديم رسائل خطأ محددة
+                if (error.code === 'permission-denied') {
+                    console.error('🔐 خطأ في الصلاحيات - تحقق من قواعد Firestore');
+                } else if (error.code === 'unavailable') {
+                    console.error('🌐 Firebase غير متاح - تحقق من اتصال الإنترنت');
                 }
                 
-                if (password === "Ww735981122" && email === "admin@aseeltv.com") {
-                    localStorage.setItem('adminAuth', 'true');
-                    localStorage.setItem('adminEmail', email);
-                    this.hideAdminLogin();
-                    window.location.href = 'admin.html';
-                } else {
-                    this.showLoginError('كلمة المرور غير صحيحة');
-                }
-            }
-
-            showAdminLogin() {
-                const modal = document.getElementById('loginModal');
-                if (modal) {
-                    modal.style.display = 'block';
-                    // تركيز على حقل كلمة المرور
-                    setTimeout(() => {
-                        const passwordField = document.getElementById('adminPassword');
-                        if (passwordField) passwordField.focus();
-                    }, 100);
-                }
-            }
-
-            hideAdminLogin() {
-                const modal = document.getElementById('loginModal');
-                if (modal) {
-                    modal.style.display = 'none';
-                    document.getElementById('adminPassword').value = '';
-                    this.hideLoginError();
-                }
-            }
-
-            showLoginError(message) {
-                const loginError = document.getElementById('loginError');
-                if (loginError) {
-                    loginError.textContent = message;
-                    loginError.style.display = 'block';
-                }
-            }
-
-            hideLoginError() {
-                const loginError = document.getElementById('loginError');
-                if (loginError) loginError.style.display = 'none';
-            }
-
-            // دالة مساعدة للتحديث اليدوي
-            refreshData() {
-                console.log('🔄 تحديث يدوي للبيانات');
-                this.loadData();
+                return false;
             }
         }
 
-        // بدء التطبيق
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('🏠 تهيئة التطبيق...');
-            window.app = new BeinSportApp();
-        });
-
-        // Fallback for emergency
-        window.addEventListener('load', () => {
-            console.log('🔄 تهيئة الطوارئ...');
+        async loadFromLocalStorage() {
+            console.log('💾 جاري تحميل البيانات من التخزين المحلي...');
             
-            // تأكد من أن event listeners الأساسية تعمل
+            try {
+                const savedSections = localStorage.getItem('bein_sections');
+                const savedChannels = localStorage.getItem('bein_channels');
+                
+                if (savedSections) {
+                    this.sections = JSON.parse(savedSections);
+                    console.log(`✅ تم تحميل ${this.sections.length} قسم من localStorage`);
+                }
+                
+                if (savedChannels) {
+                    this.channels = JSON.parse(savedChannels);
+                    console.log(`✅ تم تحميل ${this.channels.length} قناة من localStorage`);
+                }
+                
+                // إذا لم توجد بيانات محلية، استخدم البيانات الافتراضية
+                if (this.sections.length === 0 && this.channels.length === 0) {
+                    this.loadDefaultData();
+                }
+            } catch (error) {
+                console.error('❌ خطأ في تحميل البيانات المحلية:', error);
+                this.loadDefaultData();
+            }
+        }
+
+        loadDefaultData() {
+            console.log('📋 استخدام البيانات الافتراضية...');
+            
+            this.sections = [{
+                id: 'default-1',
+                name: 'قنوات بي إن سبورت',
+                order: 1,
+                isActive: true
+            }];
+            
+            this.channels = [
+                {
+                    id: 'default-1',
+                    name: 'bein sport 1',
+                    image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+1',
+                    url: '#',
+                    appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                    downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                    order: 1,
+                    sectionId: 'default-1'
+                },
+                {
+                    id: 'default-2',
+                    name: 'bein sport 2',
+                    image: 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=BEIN+2',
+                    url: '#',
+                    appUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                    downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
+                    order: 2,
+                    sectionId: 'default-1'
+                }
+            ];
+            
+            // حفظ البيانات الافتراضية في localStorage
+            this.saveToLocalStorage();
+        }
+
+        saveToLocalStorage() {
+            try {
+                localStorage.setItem('bein_sections', JSON.stringify(this.sections));
+                localStorage.setItem('bein_channels', JSON.stringify(this.channels));
+                console.log('💾 تم حفظ البيانات في التخزين المحلي');
+            } catch (error) {
+                console.error('❌ خطأ في حفظ البيانات محلياً:', error);
+            }
+        }
+
+        setupRealTimeUpdates() {
+            // تحديث تلقائي كل 5 ثوانٍ
+            setInterval(() => {
+                this.checkForUpdates();
+            }, 5000);
+
+            // الاستماع لتحديثات localStorage من التبويبات الأخرى
+            window.addEventListener('storage', (e) => {
+                if (e.key === 'bein_sections' || e.key === 'bein_channels') {
+                    console.log('🔄 تم تحديث البيانات من تبويب آخر');
+                    this.loadFromLocalStorage();
+                    this.renderData();
+                }
+            });
+
+            // إعداد مستمعي Firebase اللحظيين إذا كان متاحاً
+            if (this.firebaseReady && typeof db !== 'undefined') {
+                this.setupFirebaseListeners();
+            }
+        }
+
+        setupFirebaseListeners() {
+            try {
+                console.log('👂 جاري إعداد مستمعي Firebase...');
+
+                // مستمع للأقسام
+                db.collection('sections')
+                    .where('isActive', '==', true)
+                    .orderBy('order')
+                    .onSnapshot((snapshot) => {
+                        console.log('🔄 تحديث الأقسام من Firebase');
+                        if (!snapshot.empty) {
+                            this.sections = snapshot.docs.map(doc => ({
+                                id: doc.id,
+                                ...doc.data()
+                            }));
+                            this.saveToLocalStorage();
+                            this.renderSections();
+                        }
+                    }, (error) => {
+                        console.error('❌ خطأ في مستمع الأقسام:', error);
+                    });
+
+                // مستمع للقنوات
+                db.collection('channels')
+                    .orderBy('order')
+                    .onSnapshot((snapshot) => {
+                        console.log('🔄 تحديث القنوات من Firebase');
+                        if (!snapshot.empty) {
+                            this.channels = snapshot.docs.map(doc => ({
+                                id: doc.id,
+                                ...doc.data()
+                            }));
+                            this.saveToLocalStorage();
+                            if (this.currentSection) {
+                                this.renderChannels();
+                            }
+                        }
+                    }, (error) => {
+                        console.error('❌ خطأ في مستمع القنوات:', error);
+                    });
+
+            } catch (error) {
+                console.error('❌ خطأ في إعداد مستمعي Firebase:', error);
+            }
+        }
+
+        async checkForUpdates() {
+            if (this.firebaseReady) {
+                await this.loadFromFirebase();
+                this.renderData();
+            } else {
+                await this.loadFromLocalStorage();
+                this.renderData();
+            }
+        }
+
+        renderData() {
+            this.renderSections();
+            
+            const activeSections = this.getActiveSections();
+            if (activeSections.length > 0) {
+                if (!this.currentSection || !activeSections.find(s => s.id === this.currentSection.id)) {
+                    this.showSection(activeSections[0].id);
+                } else {
+                    this.renderChannels();
+                }
+            } else {
+                this.showNoData();
+            }
+        }
+
+        getActiveSections() {
+            return this.sections
+                .filter(section => section.isActive !== false)
+                .sort((a, b) => (a.order || 1) - (b.order || 1));
+        }
+
+        renderSections() {
+            const container = document.getElementById('sectionsContainer');
+            if (!container) {
+                console.error('❌ حاوية الأقسام غير موجودة');
+                return;
+            }
+
+            const activeSections = this.getActiveSections();
+            
+            if (activeSections.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = activeSections.map(section => `
+                <div class="section-tab ${this.currentSection?.id === section.id ? 'active' : ''}" 
+                     data-section-id="${section.id}">
+                    ${section.name}
+                </div>
+            `).join('');
+
+            // إضافة event listeners للأقسام
+            this.setupSectionEventListeners();
+        }
+
+        setupSectionEventListeners() {
+            const sectionTabs = document.querySelectorAll('.section-tab');
+            
+            sectionTabs.forEach(tab => {
+                // إزالة أي event listeners سابقة لمنع التكرار
+                const newTab = tab.cloneNode(true);
+                tab.parentNode.replaceChild(newTab, tab);
+            });
+
+            // إضافة event listeners جديدة
+            document.querySelectorAll('.section-tab').forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const sectionId = tab.getAttribute('data-section-id');
+                    console.log('🎯 نقرة على القسم:', sectionId);
+                    this.showSection(sectionId);
+                });
+            });
+        }
+
+        showSection(sectionId) {
+            console.log('📂 محاولة عرض القسم:', sectionId);
+            
+            // العثور على القسم
+            const section = this.sections.find(s => s.id === sectionId);
+            if (!section) {
+                console.error('❌ القسم غير موجود:', sectionId);
+                return;
+            }
+
+            // تحديث التبويب النشط
+            document.querySelectorAll('.section-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            const activeTab = document.querySelector(`[data-section-id="${sectionId}"]`);
+            if (activeTab) {
+                activeTab.classList.add('active');
+                console.log('✅ تم تفعيل التبويب:', section.name);
+            }
+            
+            this.currentSection = section;
+            this.renderChannels();
+        }
+
+        renderChannels() {
+            const container = document.getElementById('channelsContainer');
+            if (!container) {
+                console.error('❌ حاوية القنوات غير موجودة');
+                return;
+            }
+
+            if (!this.currentSection) {
+                container.innerHTML = '<div class="loading">لا توجد قنوات متاحة</div>';
+                return;
+            }
+
+            const sectionChannels = this.channels
+                .filter(channel => channel.sectionId === this.currentSection.id)
+                .sort((a, b) => (a.order || 1) - (b.order || 1));
+
+            console.log(`📺 عرض ${sectionChannels.length} قناة في قسم ${this.currentSection.name}`);
+
+            if (sectionChannels.length === 0) {
+                container.innerHTML = '<div class="loading">لا توجد قنوات في هذا القسم</div>';
+                return;
+            }
+
+            container.innerHTML = sectionChannels.map(channel => `
+                <div class="channel-card" data-channel-id="${channel.id}">
+                    <div class="channel-logo">
+                        <img src="${channel.image || 'https://via.placeholder.com/200x100/2F2562/FFFFFF?text=No+Image'}" 
+                             alt="${channel.name}"
+                             onerror="this.src='https://via.placeholder.com/200x100/2F2562/FFFFFF?text=No+Image'">
+                    </div>
+                    <div class="channel-name">${channel.name}</div>
+                </div>
+            `).join('');
+
+            // إضافة event listeners للقنوات
+            this.setupChannelEventListeners(sectionChannels);
+        }
+
+        setupChannelEventListeners(sectionChannels) {
+            document.querySelectorAll('.channel-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const channelId = card.getAttribute('data-channel-id');
+                    const channel = sectionChannels.find(c => c.id === channelId);
+                    if (channel) {
+                        console.log('🔗 فتح القناة:', channel.name);
+                        this.openChannel(channel);
+                    }
+                });
+            });
+        }
+
+        showNoData() {
+            const container = document.getElementById('channelsContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div class="loading">
+                        <i class="uil uil-exclamation-triangle"></i>
+                        <p>لا توجد بيانات متاحة</p>
+                        <button onclick="location.reload()" class="modal-button" style="margin-top: 15px;">
+                            إعادة تحميل الصفحة
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        openChannel(channel) {
+            if (channel.url && channel.url !== '#' && channel.url.trim() !== '') {
+                try {
+                    window.open(channel.url, '_blank');
+                } catch (error) {
+                    console.error('❌ خطأ في فتح الرابط:', error);
+                    this.showInstallModal(channel);
+                }
+            } else {
+                this.showInstallModal(channel);
+            }
+        }
+
+        showInstallModal(channel) {
+            const modal = document.getElementById('installModal');
+            if (modal) {
+                modal.style.display = "block";
+                const confirmBtn = document.getElementById('confirmInstall');
+                if (confirmBtn) {
+                    confirmBtn.onclick = () => {
+                        const downloadUrl = channel.downloadUrl || channel.appUrl || 'https://play.google.com/store/apps/details?id=com.xpola.player';
+                        window.open(downloadUrl, '_blank');
+                        this.closeModal();
+                    };
+                }
+            }
+        }
+
+        closeModal() {
+            const modal = document.getElementById('installModal');
+            if (modal) modal.style.display = "none";
+        }
+
+        setupEventListeners() {
+            console.log('🔧 إعداد مستمعي الأحداث...');
+            
+            // زر تسجيل الدخول
             const loginToggle = document.getElementById('loginToggle');
             if (loginToggle) {
                 loginToggle.addEventListener('click', (e) => {
                     e.preventDefault();
-                    const modal = document.getElementById('loginModal');
-                    if (modal) modal.style.display = 'block';
+                    e.stopPropagation();
+                    this.showAdminLogin();
                 });
             }
-            
-            // تحديث تلقائي احتياطي
-            setInterval(() => {
-                if (window.app && window.app.refreshData) {
-                    window.app.refreshData();
+
+            // زر الدخول في النافذة المنبثقة
+            const loginButton = document.getElementById('loginButton');
+            if (loginButton) {
+                loginButton.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.handleLogin();
+                });
+            }
+
+            // إلغاء الدخول
+            const cancelLogin = document.getElementById('cancelLogin');
+            if (cancelLogin) {
+                cancelLogin.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.hideAdminLogin();
+                });
+            }
+
+            // زر Enter في حقل كلمة المرور
+            const adminPassword = document.getElementById('adminPassword');
+            if (adminPassword) {
+                adminPassword.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.handleLogin();
+                    }
+                });
+            }
+
+            // إغلاق النوافذ بالنقر خارجها
+            window.addEventListener('click', (event) => {
+                if (event.target === document.getElementById('installModal')) {
+                    this.closeModal();
                 }
-            }, 10000);
-        });
-    </script>
+                if (event.target === document.getElementById('loginModal')) {
+                    this.hideAdminLogin();
+                }
+            });
 
-    <!-- أدوات التصحيح -->
-    <script>
-        // أداة تشخيص وتصحيح
-        console.log('🔧 أدوات التصحيح مفعلة');
+            // زر تأكيد التحميل
+            const confirmInstall = document.getElementById('confirmInstall');
+            if (confirmInstall) {
+                confirmInstall.addEventListener('click', () => {
+                    window.open('https://play.google.com/store/apps/details?id=com.xpola.player', '_blank');
+                    this.closeModal();
+                });
+            }
 
-        // فحص حالة التطبيق
-        function debugApp() {
-            console.log('📊 حالة التطبيق:');
-            console.log('- الأقسام:', window.app?.sections);
-            console.log('- القنوات:', window.app?.channels);
-            console.log('- القسم النشط:', window.app?.currentSection);
-            console.log('- عناصر الأقسام في DOM:', document.querySelectorAll('.section-tab').length);
+            // زر إلغاء التحميل
+            const cancelInstall = document.getElementById('cancelInstall');
+            if (cancelInstall) {
+                cancelInstall.addEventListener('click', () => {
+                    this.closeModal();
+                });
+            }
+
+            // منع انتشار الأحداث في الحاويات
+            const sectionsContainer = document.getElementById('sectionsContainer');
+            if (sectionsContainer) {
+                sectionsContainer.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+            }
+
+            const channelsContainer = document.getElementById('channelsContainer');
+            if (channelsContainer) {
+                channelsContainer.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                });
+            }
+        }
+
+        handleLogin() {
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
             
-            // اختبار event listeners
-            const sectionTabs = document.querySelectorAll('.section-tab');
-            sectionTabs.forEach((tab, index) => {
-                console.log(`- القسم ${index + 1}:`, tab.textContent, 'ID:', tab.getAttribute('data-section-id'));
+            if (!email || !password) {
+                this.showLoginError('يرجى إدخال البريد الإلكتروني وكلمة المرور');
+                return;
+            }
+            
+            if (password === "Ww735981122" && email === "admin@aseeltv.com") {
+                localStorage.setItem('adminAuth', 'true');
+                localStorage.setItem('adminEmail', email);
+                this.hideAdminLogin();
+                window.location.href = 'admin.html';
+            } else {
+                this.showLoginError('كلمة المرور غير صحيحة');
+            }
+        }
+
+        showAdminLogin() {
+            const modal = document.getElementById('loginModal');
+            if (modal) {
+                modal.style.display = 'block';
+                // تركيز على حقل كلمة المرور
+                setTimeout(() => {
+                    const passwordField = document.getElementById('adminPassword');
+                    if (passwordField) passwordField.focus();
+                }, 100);
+            }
+        }
+
+        hideAdminLogin() {
+            const modal = document.getElementById('loginModal');
+            if (modal) {
+                modal.style.display = 'none';
+                document.getElementById('adminPassword').value = '';
+                this.hideLoginError();
+            }
+        }
+
+        showLoginError(message) {
+            const loginError = document.getElementById('loginError');
+            if (loginError) {
+                loginError.textContent = message;
+                loginError.style.display = 'block';
+            }
+        }
+
+        hideLoginError() {
+            const loginError = document.getElementById('loginError');
+            if (loginError) loginError.style.display = 'none';
+        }
+
+        // دالة مساعدة للتحديث اليدوي
+        refreshData() {
+            console.log('🔄 تحديث يدوي للبيانات');
+            this.loadData();
+        }
+    }
+
+    // بدء التطبيق
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('🏠 تهيئة التطبيق...');
+        window.app = new BeinSportApp();
+    });
+
+    // Fallback for emergency
+    window.addEventListener('load', () => {
+        console.log('🔄 تهيئة الطوارئ...');
+        
+        // تأكد من أن event listeners الأساسية تعمل
+        const loginToggle = document.getElementById('loginToggle');
+        if (loginToggle) {
+            loginToggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                const modal = document.getElementById('loginModal');
+                if (modal) modal.style.display = 'block';
             });
         }
-
-        // إصلاح يدوي للتنقل
-        function fixNavigation() {
-            if (window.app) {
-                console.log('🔧 إصلاح التنقل...');
-                window.app.setupSectionEventListeners();
-                console.log('✅ تم إصلاح event listeners');
-            }
-        }
-
-        // تحديث يدوي
-        function manualRefresh() {
-            if (window.app) {
+        
+        // تحديث تلقائي احتياطي
+        setInterval(() => {
+            if (window.app && window.app.refreshData) {
                 window.app.refreshData();
             }
-        }
-
-        // فحص البيانات
-        function checkData() {
-            console.log('📊 فحص البيانات:');
-            console.log('- الأقسام في localStorage:', JSON.parse(localStorage.getItem('bein_sections') || '[]'));
-            console.log('- القنوات في localStorage:', JSON.parse(localStorage.getItem('bein_channels') || '[]'));
-        }
-
-        // جعل الدوال متاحة globally
-        window.debugApp = debugApp;
-        window.fixNavigation = fixNavigation;
-        window.manualRefresh = manualRefresh;
-        window.checkData = checkData;
-
-        // اختبار تلقائي بعد التحميل
-        setTimeout(() => {
-            console.log('🧪 اختبار تلقائي...');
-            debugApp();
-        }, 3000);
-    </script>
+        }, 10000);
+    });
+</script>
 </body>
 </html>
