@@ -1403,4 +1403,77 @@ header {
 .cancel-button:hover {
     background: linear-gradient(45deg, #c82333, #d91a7a);
 }
+/* تحسينات التحميل والعرض */
+.loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #E1E1E1;
+}
 
+.loading i {
+    font-size: 50px;
+    margin-bottom: 15px;
+    color: #654FD4;
+}
+
+.loading p {
+    font-size: 16px;
+    margin-bottom: 0;
+}
+
+/* تحسين الشبكة الاستجابة */
+@media (max-width: 768px) {
+    .channels-container {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 15px;
+        padding: 15px 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .channels-container {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 10px;
+        padding: 10px 0;
+    }
+}
+
+/* تحسين الأقسام */
+.sections-container {
+    position: fixed;
+    top: 100px;
+    width: 100%;
+    background: linear-gradient(to right, #503FA6, #151825, #2F2562);
+    padding: 10px 20px;
+    z-index: 998;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    border-bottom: 2px solid #42318F;
+    flex-wrap: wrap;
+}
+
+.section-tab {
+    background: linear-gradient(135deg, #322769, #654FD4);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+    font-size: 14px;
+    border: 2px solid #42318F;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.section-tab:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(135deg, #FF5200, #3545FF);
+}
+
+.section-tab.active {
+    background: linear-gradient(135deg, #FF5200, #3545FF);
+    border-color: #fff;
+    box-shadow: 0 0 15px rgba(255, 82, 0, 0.5);
+        }
