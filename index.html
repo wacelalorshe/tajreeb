@@ -98,5 +98,41 @@
     
     <!-- App Logic - LOAD LAST -->
     <script src="js/app.js"></script>
+
+<script>
+// أداة تشخيص للمساعدة في حل المشاكل
+console.log('🔧 أداة تشخيص Bein TV');
+
+// فحص البيانات الحالية
+function checkData() {
+    console.log('📊 فحص البيانات:');
+    console.log('- الأقسام في localStorage:', localStorage.getItem('bein_sections'));
+    console.log('- القنوات في localStorage:', localStorage.getItem('bein_channels'));
+    
+    if (window.app && window.app.dataManager) {
+        console.log('- الأقسام في الذاكرة:', window.app.dataManager.sections);
+        console.log('- القنوات في الذاكرة:', window.app.dataManager.channels);
+        console.log('- القسم النشط:', window.app.currentSection);
+    }
+}
+
+// تحديث يدوي للبيانات
+function forceRefresh() {
+    if (window.app && window.app.dataManager) {
+        window.app.dataManager.refreshData();
+        console.log('🔄 تم إجبار تحديث البيانات');
+    }
+}
+
+// جعل الدوال متاحة globally
+window.checkData = checkData;
+window.forceRefresh = forceRefresh;
+
+// فحص تلقائي عند التحميل
+setTimeout(() => {
+    checkData();
+}, 2000);
+</script>
 </body>
+
 </html>
