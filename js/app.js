@@ -16,9 +16,27 @@ class BeinSportApp {
         this.setupEventListeners();
         await this.initializeFirebase();
         await this.loadData();
+        
+        // التحقق مما إذا كان هناك قسم محدد في الرابط
+        this.checkUrlForSection();
+        
         this.setupRealTimeUpdates();
         
         console.log('✅ تم تهيئة التطبيق بنجاح');
+    }
+
+    // دالة جديدة: التحقق من وجود قسم في الرابط
+    checkUrlForSection() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sectionId = urlParams.get('section');
+        
+        if (sectionId) {
+            console.log('📋 تم العثور على قسم في الرابط:', sectionId);
+            // انتظر قليلاً لتحميل البيانات ثم اعرض القسم
+            setTimeout(() => {
+                this.showSection(sectionId);
+            }, 100);
+        }
     }
 
     async initializeFirebase() {
@@ -307,10 +325,16 @@ class BeinSportApp {
         
         const activeSections = this.getActiveSections();
         if (activeSections.length > 0) {
-            if (!this.currentSection || !activeSections.find(s => s.id === this.currentSection.id)) {
-                this.showSection(activeSections[0].id);
-            } else {
-                this.renderChannels();
+            // إذا لم يكن هناك قسم محدد في الرابط، اعرض القسم الأول
+            const urlParams = new URLSearchParams(window.location.search);
+            const sectionIdFromUrl = urlParams.get('section');
+            
+            if (!sectionIdFromUrl) {
+                if (!this.currentSection || !activeSections.find(s => s.id === this.currentSection.id)) {
+                    this.showSection(activeSections[0].id);
+                } else {
+                    this.renderChannels();
+                }
             }
         } else {
             this.showNoData();
@@ -340,7 +364,7 @@ class BeinSportApp {
         container.innerHTML = activeSections.map(section => `
             <div class="section-tab ${this.currentSection?.id === section.id ? 'active' : ''}" 
                  data-section-id="${section.id}">
-                ${section.name}
+                <a href="?section=${section.id}" target="_blank" class="section-link">${section.name}</a>
             </div>
         `).join('');
 
@@ -362,7 +386,12 @@ class BeinSportApp {
                 
                 const sectionId = tab.getAttribute('data-section-id');
                 console.log('🎯 نقرة على القسم:', sectionId);
-                this.showSection(sectionId);
+                
+                // فتح الرابط في صفحة جديدة
+                const sectionLink = tab.querySelector('.section-link');
+                if (sectionLink) {
+                    window.open(sectionLink.href, '_blank');
+                }
             });
         });
     }
