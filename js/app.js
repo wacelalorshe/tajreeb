@@ -357,38 +357,54 @@ class BeinSportApp {
         const activeSections = this.getActiveSections();
         
         if (activeSections.length === 0) {
-            container.innerHTML = '';
+            container.innerHTML = '<div class="loading">لا توجد أقسام متاحة</div>';
             return;
         }
 
-        container.innerHTML = activeSections.map(section => `
-            <div class="section-tab ${this.currentSection?.id === section.id ? 'active' : ''}" 
-                 data-section-id="${section.id}">
-                <a href="?section=${section.id}" target="_blank" class="section-link">${section.name}</a>
+        // عرض الأقسام كبطاقات
+        container.innerHTML = `
+            <div class="sections-grid">
+                ${activeSections.map(section => {
+                    // استخدام الرابط المخصص إذا كان موجوداً، وإلا استخدم معرف القسم
+                    const sectionUrl = section.customUrl ? section.customUrl : section.id;
+                    const isActive = this.currentSection?.id === section.id;
+                    
+                    return `
+                        <div class="section-card ${isActive ? 'active' : ''}" 
+                             data-section-id="${section.id}">
+                            <a href="?section=${sectionUrl}" target="_blank" class="section-card-link">
+                                <div class="section-icon">
+                                    <i class="uil uil-folder"></i>
+                                </div>
+                                <div class="section-name">${section.name}</div>
+                                ${section.description ? `<div class="section-description">${section.description}</div>` : ''}
+                                <div class="section-badge">${this.getChannelsCount(section.id)} قناة</div>
+                            </a>
+                        </div>
+                    `;
+                }).join('')}
             </div>
-        `).join('');
+        `;
 
         this.setupSectionEventListeners();
     }
 
-    setupSectionEventListeners() {
-        const sectionTabs = document.querySelectorAll('.section-tab');
-        
-        sectionTabs.forEach(tab => {
-            const newTab = tab.cloneNode(true);
-            tab.parentNode.replaceChild(newTab, tab);
-        });
+    // دالة جديدة: الحصول على عدد القنوات في القسم
+    getChannelsCount(sectionId) {
+        return this.channels.filter(channel => channel.sectionId === sectionId).length;
+    }
 
-        document.querySelectorAll('.section-tab').forEach(tab => {
-            tab.addEventListener('click', (e) => {
+    setupSectionEventListeners() {
+        document.querySelectorAll('.section-card').forEach(card => {
+            card.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 
-                const sectionId = tab.getAttribute('data-section-id');
+                const sectionId = card.getAttribute('data-section-id');
                 console.log('🎯 نقرة على القسم:', sectionId);
                 
                 // فتح الرابط في صفحة جديدة
-                const sectionLink = tab.querySelector('.section-link');
+                const sectionLink = card.querySelector('.section-card-link');
                 if (sectionLink) {
                     window.open(sectionLink.href, '_blank');
                 }
@@ -405,14 +421,14 @@ class BeinSportApp {
             return;
         }
 
-        document.querySelectorAll('.section-tab').forEach(tab => {
-            tab.classList.remove('active');
+        document.querySelectorAll('.section-card').forEach(card => {
+            card.classList.remove('active');
         });
         
-        const activeTab = document.querySelector(`[data-section-id="${sectionId}"]`);
-        if (activeTab) {
-            activeTab.classList.add('active');
-            console.log('✅ تم تفعيل التبويب:', section.name);
+        const activeCard = document.querySelector(`[data-section-id="${sectionId}"]`);
+        if (activeCard) {
+            activeCard.classList.add('active');
+            console.log('✅ تم تفعيل البطاقة:', section.name);
         }
         
         this.currentSection = section;
@@ -669,7 +685,8 @@ class BeinSportApp {
             id: 'default-1',
             name: 'قنوات بي إن سبورت',
             order: 1,
-            isActive: true
+            isActive: true,
+            description: 'جميع قنوات بي إن سبورت الرياضية'
         }];
         
         this.channels = [
