@@ -1,3 +1,5 @@
+[file name]: admin.html
+[file content begin]
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -163,6 +165,24 @@
             margin-top: 10px;
             display: none;
         }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .edit-form {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border: 1px solid #42318F;
+        }
     </style>
 </head>
 <body>
@@ -174,7 +194,7 @@
                     <h1 style="color: #E1E1E1; text-shadow: 0 2px 4px rgba(0,0,0,0.5); font-size: 2.5rem;">
                         <i class="uil uil-setting"></i> لوحة إدارة القنوات والأقسام
                     </h1>
-                    <p class="text-muted">إدارة قنوات BEIN SPORT والأقسام</p>
+                    <p class="text-muted">إدارة قنوات BEIN SPORT والأقسام - التعديل والحذف والإضافة</p>
                 </div>
 
                 <!-- Firebase Status -->
@@ -211,7 +231,7 @@
     <script src="js/firebase-config.js"></script>
     
     <script>
-        // نظام إدارة متكامل مع Firebase
+        // نظام إدارة متكامل مع Firebase مع دعم التعديل
         class AdminManager {
             constructor() {
                 this.isAuthenticated = false;
@@ -219,6 +239,8 @@
                 this.firestoreAvailable = false;
                 this.sections = [];
                 this.channels = [];
+                this.editingSection = null;
+                this.editingChannel = null;
                 this.init();
             }
 
@@ -350,14 +372,19 @@
                     <div class="sync-actions">
                         <h5 class="text-white mb-3"><i class="uil uil-database"></i> إجراءات البيانات</h5>
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <button class="btn btn-info w-100 mb-2" onclick="adminManager.exportData()">
                                     <i class="uil uil-import"></i> تصدير البيانات
                                 </button>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <button class="btn btn-warning w-100 mb-2" onclick="adminManager.importData()">
                                     <i class="uil uil-export"></i> استيراد البيانات
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-success w-100 mb-2" onclick="adminManager.refreshData()">
+                                    <i class="uil uil-refresh"></i> تحديث البيانات
                                 </button>
                             </div>
                         </div>
@@ -365,22 +392,28 @@
 
                     <!-- Stats Overview -->
                     <div class="row mb-4">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="stats-card">
                                 <div class="stats-number" id="totalSections">0</div>
                                 <div class="stats-label">عدد الأقسام</div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="stats-card">
                                 <div class="stats-number" id="totalChannels">0</div>
                                 <div class="stats-label">عدد القنوات</div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="stats-card">
                                 <div class="stats-number" id="activeSections">0</div>
                                 <div class="stats-label">الأقسام النشطة</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="stats-card">
+                                <div class="stats-number" id="totalViews">0</div>
+                                <div class="stats-label">إجمالي المشاهدات</div>
                             </div>
                         </div>
                     </div>
@@ -438,15 +471,17 @@
 
             loadSectionsTab() {
                 return `
-                    <!-- Add Section Form -->
+                    <!-- Add/Edit Section Form -->
                     <div class="card mb-5" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
                         <div class="card-header card-header-custom">
                             <h4 class="mb-0 text-white">
-                                <i class="uil uil-plus-circle"></i> إضافة قسم جديد
+                                <i class="uil uil-plus-circle"></i> 
+                                <span id="sectionFormTitle">إضافة قسم جديد</span>
                             </h4>
                         </div>
                         <div class="card-body">
-                            <form id="sectionForm" onsubmit="adminManager.addSection(event)">
+                            <form id="sectionForm" onsubmit="adminManager.saveSection(event)">
+                                <input type="hidden" id="sectionId">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group mb-3">
@@ -482,9 +517,15 @@
                                         </div>
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-success w-100 py-3">
-                                    <i class="uil uil-plus-circle"></i> إضافة قسم جديد
-                                </button>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-success flex-fill py-3">
+                                        <i class="uil uil-save"></i> 
+                                        <span id="sectionSaveButton">حفظ القسم</span>
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="adminManager.cancelEditSection()" id="cancelSectionEdit" style="display: none;">
+                                        <i class="uil uil-times"></i> إلغاء
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -513,15 +554,17 @@
 
             loadChannelsTab() {
                 return `
-                    <!-- Add Channel Form -->
+                    <!-- Add/Edit Channel Form -->
                     <div class="card mb-5" style="background: rgba(0,0,0,0.7); border: 1px solid #42318F;">
                         <div class="card-header card-header-custom">
                             <h4 class="mb-0 text-white">
-                                <i class="uil uil-plus-circle"></i> إضافة قناة جديدة
+                                <i class="uil uil-plus-circle"></i> 
+                                <span id="channelFormTitle">إضافة قناة جديدة</span>
                             </h4>
                         </div>
                         <div class="card-body">
-                            <form id="channelForm" onsubmit="adminManager.addChannel(event)">
+                            <form id="channelForm" onsubmit="adminManager.saveChannel(event)">
+                                <input type="hidden" id="channelId">
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="form-group mb-3">
@@ -555,9 +598,15 @@
                                         </div>
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-success w-100 py-3">
-                                    <i class="uil uil-plus-circle"></i> إضافة قناة جديدة
-                                </button>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-success flex-fill py-3">
+                                        <i class="uil uil-save"></i> 
+                                        <span id="channelSaveButton">حفظ القناة</span>
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="adminManager.cancelEditChannel()" id="cancelChannelEdit" style="display: none;">
+                                        <i class="uil uil-times"></i> إلغاء
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -571,6 +620,9 @@
                             </h4>
                         </div>
                         <div class="card-body">
+                            <div class="mb-3">
+                                <input type="text" id="channelSearch" class="form-control" placeholder="🔍 بحث في القنوات..." oninput="adminManager.filterChannels()">
+                            </div>
                             <div id="channelsList">
                                 <div class="text-center py-5">
                                     <div class="spinner-border text-primary" role="status">
@@ -720,13 +772,17 @@ service cloud.firestore {
                                     <div class="text-muted">
                                         <small>الترتيب: ${section.order || 1}</small>
                                         <span class="mx-2">•</span>
-                                        <small>${section.isActive !== false ? 'نشط' : 'غير نشط'}</small>
+                                        <small class="${section.isActive !== false ? 'text-success' : 'text-danger'}">
+                                            ${section.isActive !== false ? 'نشط' : 'غير نشط'}
+                                        </small>
                                         ${section.description ? `<span class="mx-2">•</span><small>${section.description}</small>` : ''}
-                                        ${section.image ? `<span class="mx-2">•</span><small>🖼️</small>` : ''}
                                     </div>
                                 </div>
                             </div>
-                            <div>
+                            <div class="action-buttons">
+                                <button class="btn btn-warning btn-sm" onclick="adminManager.editSection('${section.id}')">
+                                    <i class="uil uil-edit"></i> تعديل
+                                </button>
                                 <button class="btn btn-danger btn-sm" onclick="adminManager.deleteSection('${section.id}')">
                                     <i class="uil uil-trash-alt"></i> حذف
                                 </button>
@@ -755,7 +811,9 @@ service cloud.firestore {
                     return;
                 }
                 
-                container.innerHTML = this.channels.map(channel => {
+                const filteredChannels = this.filteredChannels || this.channels;
+                
+                container.innerHTML = filteredChannels.map(channel => {
                     const section = this.sections.find(s => s.id === channel.sectionId);
                     return `
                     <div class="channel-item">
@@ -771,17 +829,24 @@ service cloud.firestore {
                                     <div class="text-muted">
                                         <small>الترتيب: ${channel.order || 1}</small>
                                         ${section ? `<span class="mx-2">•</span><small>${section.name}</small>` : ''}
+                                        <span class="mx-2">•</span>
+                                        <small>${channel.url ? '🔗' : '❌'}</small>
                                     </div>
                                 </div>
                             </div>
-                            <button class="btn btn-danger btn-sm" onclick="adminManager.deleteChannel('${channel.id}')">
-                                <i class="uil uil-trash-alt"></i> حذف
-                            </button>
+                            <div class="action-buttons">
+                                <button class="btn btn-warning btn-sm" onclick="adminManager.editChannel('${channel.id}')">
+                                    <i class="uil uil-edit"></i> تعديل
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="adminManager.deleteChannel('${channel.id}')">
+                                    <i class="uil uil-trash-alt"></i> حذف
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `}).join('');
                 
-                if (countElement) countElement.textContent = this.channels.length;
+                if (countElement) countElement.textContent = filteredChannels.length;
             }
 
             populateSectionDropdown() {
@@ -798,9 +863,14 @@ service cloud.firestore {
                 document.getElementById('totalSections').textContent = this.sections.length;
                 document.getElementById('totalChannels').textContent = this.channels.length;
                 document.getElementById('activeSections').textContent = this.sections.filter(s => s.isActive !== false).length;
+                
+                // حساب إجمالي المشاهدات (يمكن تطويره لاحقاً)
+                const totalViews = this.channels.reduce((sum, channel) => sum + (channel.views || 0), 0);
+                document.getElementById('totalViews').textContent = totalViews.toLocaleString();
             }
 
-            async addSection(event) {
+            // وظائف إدارة الأقسام
+            async saveSection(event) {
                 event.preventDefault();
                 
                 const sectionData = {
@@ -808,8 +878,7 @@ service cloud.firestore {
                     order: parseInt(document.getElementById('sectionOrder').value),
                     isActive: document.getElementById('sectionStatus').value === 'active',
                     description: document.getElementById('sectionDescription').value,
-                    image: document.getElementById('sectionImage').value, // إضافة حقل الصورة
-                    createdAt: new Date(),
+                    image: document.getElementById('sectionImage').value,
                     updatedAt: new Date()
                 };
                 
@@ -818,37 +887,91 @@ service cloud.firestore {
                     return;
                 }
                 
+                const sectionId = document.getElementById('sectionId').value;
+                
                 try {
-                    let sectionId;
-                    
-                    if (this.firestoreAvailable) {
-                        const docRef = await db.collection('sections').add(sectionData);
-                        sectionId = docRef.id;
-                        console.log('✅ تم إضافة القسم إلى Firebase:', sectionId);
+                    if (sectionId) {
+                        // تحديث قسم موجود
+                        if (this.firestoreAvailable) {
+                            await db.collection('sections').doc(sectionId).update(sectionData);
+                        }
+                        
+                        const index = this.sections.findIndex(s => s.id === sectionId);
+                        if (index !== -1) {
+                            this.sections[index] = { ...this.sections[index], ...sectionData };
+                        }
+                        
+                        this.showAlert('تم تحديث القسم بنجاح', 'success');
                     } else {
-                        sectionId = 'local_' + Date.now();
-                        sectionData.id = sectionId;
+                        // إضافة قسم جديد
+                        sectionData.createdAt = new Date();
+                        let newSectionId;
+                        
+                        if (this.firestoreAvailable) {
+                            const docRef = await db.collection('sections').add(sectionData);
+                            newSectionId = docRef.id;
+                        } else {
+                            newSectionId = 'local_' + Date.now();
+                            sectionData.id = newSectionId;
+                        }
+                        
+                        this.sections.push({
+                            id: newSectionId,
+                            ...sectionData
+                        });
+                        
+                        this.showAlert('تم إضافة القسم بنجاح', 'success');
                     }
-                    
-                    this.sections.push({
-                        id: sectionId,
-                        ...sectionData
-                    });
                     
                     this.saveDataToLocalStorage();
                     this.renderData();
-                    document.getElementById('sectionForm').reset();
-                    document.getElementById('sectionImagePreview').style.display = 'none';
-                    
-                    this.showAlert('تم إضافة القسم بنجاح', 'success');
+                    this.resetSectionForm();
                     
                 } catch (error) {
-                    console.error('❌ خطأ في إضافة القسم:', error);
-                    this.showAlert('خطأ في إضافة القسم: ' + error.message, 'error');
+                    console.error('❌ خطأ في حفظ القسم:', error);
+                    this.showAlert('خطأ في حفظ القسم: ' + error.message, 'error');
                 }
             }
 
-            async addChannel(event) {
+            editSection(sectionId) {
+                const section = this.sections.find(s => s.id === sectionId);
+                if (!section) return;
+                
+                this.editingSection = section;
+                
+                document.getElementById('sectionId').value = section.id;
+                document.getElementById('sectionName').value = section.name;
+                document.getElementById('sectionOrder').value = section.order || 1;
+                document.getElementById('sectionStatus').value = section.isActive !== false ? 'active' : 'inactive';
+                document.getElementById('sectionDescription').value = section.description || '';
+                document.getElementById('sectionImage').value = section.image || '';
+                
+                document.getElementById('sectionFormTitle').textContent = 'تعديل القسم';
+                document.getElementById('sectionSaveButton').textContent = 'تحديث القسم';
+                document.getElementById('cancelSectionEdit').style.display = 'block';
+                
+                this.updateImagePreview(section.image, 'sectionImagePreview');
+                
+                // التمرير إلى الأعلى
+                document.getElementById('sectionForm').scrollIntoView({ behavior: 'smooth' });
+            }
+
+            cancelEditSection() {
+                this.editingSection = null;
+                this.resetSectionForm();
+            }
+
+            resetSectionForm() {
+                document.getElementById('sectionForm').reset();
+                document.getElementById('sectionId').value = '';
+                document.getElementById('sectionFormTitle').textContent = 'إضافة قسم جديد';
+                document.getElementById('sectionSaveButton').textContent = 'حفظ القسم';
+                document.getElementById('cancelSectionEdit').style.display = 'none';
+                document.getElementById('sectionImagePreview').style.display = 'none';
+            }
+
+            // وظائف إدارة القنوات
+            async saveChannel(event) {
                 event.preventDefault();
                 
                 const channelData = {
@@ -859,7 +982,6 @@ service cloud.firestore {
                     sectionId: document.getElementById('channelSection').value,
                     appUrl: document.getElementById('channelAppUrl').value || 'https://play.google.com/store/apps/details?id=com.xpola.player',
                     downloadUrl: 'https://play.google.com/store/apps/details?id=com.xpola.player',
-                    createdAt: new Date(),
                     updatedAt: new Date()
                 };
                 
@@ -868,34 +990,103 @@ service cloud.firestore {
                     return;
                 }
                 
+                const channelId = document.getElementById('channelId').value;
+                
                 try {
-                    let channelId;
-                    
-                    if (this.firestoreAvailable) {
-                        const docRef = await db.collection('channels').add(channelData);
-                        channelId = docRef.id;
-                        console.log('✅ تم إضافة القناة إلى Firebase:', channelId);
+                    if (channelId) {
+                        // تحديث قناة موجودة
+                        if (this.firestoreAvailable) {
+                            await db.collection('channels').doc(channelId).update(channelData);
+                        }
+                        
+                        const index = this.channels.findIndex(c => c.id === channelId);
+                        if (index !== -1) {
+                            this.channels[index] = { ...this.channels[index], ...channelData };
+                        }
+                        
+                        this.showAlert('تم تحديث القناة بنجاح', 'success');
                     } else {
-                        channelId = 'local_' + Date.now();
-                        channelData.id = channelId;
+                        // إضافة قناة جديدة
+                        channelData.createdAt = new Date();
+                        let newChannelId;
+                        
+                        if (this.firestoreAvailable) {
+                            const docRef = await db.collection('channels').add(channelData);
+                            newChannelId = docRef.id;
+                        } else {
+                            newChannelId = 'local_' + Date.now();
+                            channelData.id = newChannelId;
+                        }
+                        
+                        this.channels.push({
+                            id: newChannelId,
+                            ...channelData
+                        });
+                        
+                        this.showAlert('تم إضافة القناة بنجاح', 'success');
                     }
-                    
-                    this.channels.push({
-                        id: channelId,
-                        ...channelData
-                    });
                     
                     this.saveDataToLocalStorage();
                     this.renderData();
-                    document.getElementById('channelForm').reset();
-                    document.getElementById('channelImagePreview').style.display = 'none';
-                    
-                    this.showAlert('تم إضافة القناة بنجاح', 'success');
+                    this.resetChannelForm();
                     
                 } catch (error) {
-                    console.error('❌ خطأ في إضافة القناة:', error);
-                    this.showAlert('خطأ في إضافة القناة: ' + error.message, 'error');
+                    console.error('❌ خطأ في حفظ القناة:', error);
+                    this.showAlert('خطأ في حفظ القناة: ' + error.message, 'error');
                 }
+            }
+
+            editChannel(channelId) {
+                const channel = this.channels.find(c => c.id === channelId);
+                if (!channel) return;
+                
+                this.editingChannel = channel;
+                
+                document.getElementById('channelId').value = channel.id;
+                document.getElementById('channelName').value = channel.name;
+                document.getElementById('channelImage').value = channel.image || '';
+                document.getElementById('channelUrl').value = channel.url;
+                document.getElementById('channelOrder').value = channel.order || 1;
+                document.getElementById('channelSection').value = channel.sectionId;
+                document.getElementById('channelAppUrl').value = channel.appUrl || 'https://play.google.com/store/apps/details?id=com.xpola.player';
+                
+                document.getElementById('channelFormTitle').textContent = 'تعديل القناة';
+                document.getElementById('channelSaveButton').textContent = 'تحديث القناة';
+                document.getElementById('cancelChannelEdit').style.display = 'block';
+                
+                this.updateImagePreview(channel.image, 'channelImagePreview');
+                
+                // التمرير إلى الأعلى
+                document.getElementById('channelForm').scrollIntoView({ behavior: 'smooth' });
+            }
+
+            cancelEditChannel() {
+                this.editingChannel = null;
+                this.resetChannelForm();
+            }
+
+            resetChannelForm() {
+                document.getElementById('channelForm').reset();
+                document.getElementById('channelId').value = '';
+                document.getElementById('channelFormTitle').textContent = 'إضافة قناة جديدة';
+                document.getElementById('channelSaveButton').textContent = 'حفظ القناة';
+                document.getElementById('cancelChannelEdit').style.display = 'none';
+                document.getElementById('channelImagePreview').style.display = 'none';
+                document.getElementById('channelAppUrl').value = 'https://play.google.com/store/apps/details?id=com.xpola.player';
+            }
+
+            filterChannels() {
+                const searchTerm = document.getElementById('channelSearch').value.toLowerCase();
+                
+                if (!searchTerm) {
+                    this.filteredChannels = null;
+                } else {
+                    this.filteredChannels = this.channels.filter(channel => 
+                        channel.name.toLowerCase().includes(searchTerm)
+                    );
+                }
+                
+                this.renderChannelsList();
             }
 
             updateImagePreview(imageUrl, previewId) {
@@ -984,31 +1175,11 @@ service cloud.firestore {
 
             async exportData() {
                 try {
-                    if (!this.firestoreAvailable) {
-                        throw new Error('Firebase غير متاح للتصدير');
-                    }
-
-                    const database = db;
-                    if (!database) {
-                        throw new Error('قاعدة البيانات غير متاحة');
-                    }
-
-                    const [sectionsSnapshot, channelsSnapshot] = await Promise.all([
-                        database.collection('sections').get(),
-                        database.collection('channels').get()
-                    ]);
-
                     const data = {
-                        sections: sectionsSnapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        })),
-                        channels: channelsSnapshot.docs.map(doc => ({
-                            id: doc.id,
-                            ...doc.data()
-                        })),
+                        sections: this.sections,
+                        channels: this.channels,
                         exportedAt: new Date(),
-                        version: '1.0'
+                        version: '2.0'
                     };
 
                     const dataStr = JSON.stringify(data, null, 2);
@@ -1107,6 +1278,11 @@ service cloud.firestore {
                 }
             }
 
+            refreshData() {
+                this.showAlert('جاري تحديث البيانات...', 'info');
+                this.loadData();
+            }
+
             showAlert(message, type) {
                 const alertDiv = document.createElement('div');
                 alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
@@ -1148,3 +1324,4 @@ service cloud.firestore {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
+[file content end]
