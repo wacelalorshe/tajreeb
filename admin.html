@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>لوحة الإدارة - Aseel TV</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.0/css/line.css">
+    <link rel="stylesheet" href="css/style.css">
+
+    <style>
+        /* أنماط مدمجة خاصة بلوحة الإدارة */
+        body {
+            background: linear-gradient(to right, #322769, #151825, #322769);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .admin-container { max-width: 1200px; margin: 0 auto; }
+        .admin-panel { background: rgba(0,0,0,0.9); padding: 25px; border-radius: 15px; border: 2px solid #42318F; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+        .card-header-custom { background: linear-gradient(135deg, #322769, #654FD4) !important; border-bottom: 2px solid #42318F !important; padding: 15px 20px; }
+        .notify-preview { width: 100%; max-height: 220px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="row">
+            <div class="col-12 text-center mb-4">
+                <h1 style="color: #E1E1E1; font-size: 2rem;"><i class="uil uil-setting"></i> لوحة إدارة Aseel TV</h1>
+                <p class="text-muted">إدارة القنوات والأقسام والإشعارات</p>
+            </div>
+        </div>
+
+        <div id="firebaseStatus" class="firebase-status" style="display:none; text-align:center; padding:12px; border-radius:8px;"></div>
+
+        <div id="adminPanel" class="admin-panel" style="display:none;">
+            <!-- إجراءات بيانات عامة -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card" style="background: rgba(0,0,0,0.6); border:1px solid #42318F;">
+                        <div class="card-body text-center">
+                            <h5><i class="uil uil-database"></i> حالة قاعدة البيانات</h5>
+                            <p id="dbStatusText" class="mb-0"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تبويبات -->
+            <ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="sections-tab" data-bs-toggle="tab" data-bs-target="#sectionsTab" type="button" role="tab">الأقسام</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="channels-tab" data-bs-toggle="tab" data-bs-target="#channelsTab" type="button" role="tab">القنوات</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="notifications-tab" data-bs-toggle="tab" data-bs-target="#notificationsTab" type="button" role="tab">الإشعارات</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="firebase-tab" data-bs-toggle="tab" data-bs-target="#firebaseTab" type="button" role="tab">Firebase</button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- أقسام (مكانها كما كان) - نضع اختصارًا -->
+                <div class="tab-pane fade show active" id="sectionsTab" role="tabpanel">
+                    <div class="card mb-3" style="background: rgba(0,0,0,0.6); border:1px solid #42318F;">
+                        <div class="card-header card-header-custom"><h5 class="mb-0">إدارة الأقسام</h5></div>
+                        <div class="card-body">
+                            <!-- المحتوى الأصلي لإدارة الأقسام يُملأ ديناميكياً -->
+                            <div id="sectionsListContainer">جاري التحميل...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قنوات -->
+                <div class="tab-pane fade" id="channelsTab" role="tabpanel">
+                    <div class="card mb-3" style="background: rgba(0,0,0,0.6); border:1px solid #42318F;">
+                        <div class="card-header card-header-custom"><h5 class="mb-0">إدارة القنوات</h5></div>
+                        <div class="card-body">
+                            <div id="channelsListContainer">جاري التحميل...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- إشعارات -->
+                <div class="tab-pane fade" id="notificationsTab" role="tabpanel">
+                    <div class="card mb-3" style="background: rgba(0,0,0,0.6); border:1px solid #42318F;">
+                        <div class="card-header card-header-custom"><h5 class="mb-0">إرسال إشعار جديد</h5></div>
+                        <div class="card-body">
+                            <form id="notifyForm">
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">عنوان الإشعار *</label>
+                                        <input type="text" id="notifyTitle" class="form-control" required placeholder="مثال: تذكير بالبث المباشر">
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label class="form-label">رابط صورة (اختياري)</label>
+                                        <input type="text" id="notifyImage" class="form-control" placeholder="https://...">
+                                    </div>
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">نص الإشعار *</label>
+                                    <textarea id="notifyMessage" class="form-control" rows="3" required placeholder="نص الإشعار"></textarea>
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="form-label">رابط (اختياري)</label>
+                                    <input type="text" id="notifyLink" class="form-control" placeholder="https://...">
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-success" id="sendNotifyBtn"><i class="uil uil-bell"></i> إرسال الإشعار</button>
+                                    <button type="button" class="btn btn-secondary" id="previewNotifyBtn"><i class="uil uil-eye"></i> معاينة</button>
+                                </div>
+
+                                <div id="notifyPreview" class="mt-3" style="display:none;">
+                                    <div class="card" style="background: rgba(255,255,255,0.03); border:1px solid #42318F;">
+                                        <div class="card-body">
+                                            <img id="notifyPreviewImg" class="notify-preview" src="" alt="معاينة الصورة" style="display:none;">
+                                            <h5 id="notifyPreviewTitle"></h5>
+                                            <p id="notifyPreviewMsg"></p>
+                                            <a id="notifyPreviewLink" href="#" target="_blank" style="display:none;">فتح الرابط</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- قائمة آخر الإشعارات المخزنة في لوحة الإدارة -->
+                    <div class="card" style="background: rgba(0,0,0,0.6); border:1px solid #42318F;">
+                        <div class="card-header card-header-custom"><h5 class="mb-0">آخر الإشعارات المرسلة (محلياً / من Firebase)</h5></div>
+                        <div class="card-body">
+                            <div id="sentNotificationsList">جاري التحميل...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Firebase Tab -->
+                <div class="tab-pane fade" id="firebaseTab" role="tabpanel">
+                    <div class="card" style="background: rgba(0,0,0,0.6); border:1px solid #42318F;">
+                        <div class="card-header card-header-custom"><h5 class="mb-0">إعدادات Firebase - مساعدة</h5></div>
+                        <div class="card-body">
+                            <p>إذا ظهرت مشكلة صلاحيات في Firestore استخدم قواعد القراءة والكتابة المؤقتة أثناء الإعداد (لا تستخدمها في الإنتاج بدون ضبط صلاحيات آمنة):</p>
+<pre style="direction:ltr; text-align:left; background:#111; color:#fff; padding:10px; border-radius:6px;">
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+</pre>
+                            <button class="btn btn-primary" id="retryFirebaseBtn"><i class="uil uil-refresh"></i> إعادة فحص الاتصال</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div> <!-- end tab-content -->
+
+            <div class="mt-4 text-center">
+                <button class="btn btn-danger" id="logoutBtn"><i class="uil uil-signout"></i> تسجيل الخروج</button>
+            </div>
+        </div>
+
+        <!-- حالة تسجيل الدخول -->
+        <div id="loginRequired" style="display:none; text-align:center; padding:40px; background:rgba(0,0,0,0.6); border-radius:10px; border:1px solid #42318F;">
+            <i class="uil uil-lock-alt" style="font-size:72px; color:#FF5200;"></i>
+            <h3>يجب تسجيل الدخول للوصول إلى لوحة الإدارة</h3>
+            <p>ارجع إلى الصفحة الرئيسية لتسجيل الدخول</p>
+            <a href="index.html" class="btn btn-primary">العودة للرئيسية</a>
+        </div>
+
+    </div> <!-- admin-container -->
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <!-- ملف إعداد Firebase الخاص بمشروعك -->
+    <script src="js/firebase-config.js"></script>
+
+    <script>
+    // =========================
+    // AdminManager (مبسط ومحدث)
+    // =========================
+    class AdminManager {
+        constructor() {
+            this.isAuthenticated = false;
+            this.firebaseAvailable = false;
+            this.sections = [];
+            this.channels = [];
+            this.notifications = [];
+            this.init();
+        }
+
+        async init() {
+            this.checkAuthentication();
+            await this.checkFirebase();
+            this.setupUI();
+            this.loadData();
+            this.bindUIActions();
+        }
+
+        checkAuthentication() {
+            const storedAuth = localStorage.getItem('adminAuth');
+            const storedEmail = localStorage.getItem('adminEmail');
+            this.isAuthenticated = storedAuth === 'true' && storedEmail;
+            if (this.isAuthenticated) {
+                document.getElementById('adminPanel').style.display = 'block';
+                document.getElementById('loginRequired').style.display = 'none';
+            } else {
+                document.getElementById('adminPanel').style.display = 'none';
+                document.getElementById('loginRequired').style.display = 'block';
+            }
+        }
+
+        async checkFirebase() {
+            try {
+                if (typeof firebase === 'undefined' || typeof db === 'undefined') {
+                    this.setFirebaseStatus('Firebase غير متاح محلياً', 'warning');
+                    this.firebaseAvailable = false;
+                    return;
+                }
+                // اختبار بسيط للاتصال
+                const testRef = db.collection('__test_connection__').doc('_ping_');
+                await testRef.set({ ping: Date.now() });
+                await testRef.delete();
+
+                this.firebaseAvailable = true;
+                this.setFirebaseStatus('متصل بقاعدة البيانات', 'success');
+            } catch (err) {
+                console.error('firebase check err', err);
+                this.firebaseAvailable = false;
+                this.setFirebaseStatus('تعذر الاتصال بـ Firebase: ' + (err.message || err), 'error');
+            }
+        }
+
+        setFirebaseStatus(msg, type) {
+            const el = document.getElementById('firebaseStatus');
+            el.style.display = 'block';
+            el.textContent = msg;
+            el.className = 'firebase-status';
+            if (type === 'success') el.style.background = 'rgba(40,167,69,0.12)';
+            if (type === 'error') el.style.background = 'rgba(220,53,69,0.12)';
+            if (type === 'warning') el.style.background = 'rgba(255,193,7,0.08)';
+            document.getElementById('dbStatusText').innerHTML = msg;
+        }
+
+        setupUI() {
+            // reset placeholders if needed
+        }
+
+        bindUIActions() {
+            document.getElementById('retryFirebaseBtn').addEventListener('click', () => this.retryFirebaseConnection());
+            document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
+            document.getElementById('sendNotifyBtn').addEventListener('click', (e) => this.handleSendNotify(e));
+            document.getElementById('previewNotifyBtn').addEventListener('click', (e) => this.handlePreviewNotify(e));
+        }
+
+        async loadData() {
+            if (this.firebaseAvailable) {
+                await this.loadFromFirestore();
+            } else {
+                this.loadFromLocal();
+            }
+            this.renderSentNotifications();
+            // sections/channels rendering hooks (if present) can be called here
+        }
+
+        async loadFromFirestore() {
+            try {
+                const notSnap = await db.collection('notifications').orderBy('timestamp','desc').limit(100).get();
+                this.notifications = notSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            } catch (err) {
+                console.error('loadFromFirestore err', err);
+                this.notifications = JSON.parse(localStorage.getItem('app_notifications') || '[]');
+            }
+        }
+
+        loadFromLocal() {
+            this.notifications = JSON.parse(localStorage.getItem('app_notifications') || '[]');
+        }
+
+        renderSentNotifications() {
+            const container = document.getElementById('sentNotificationsList');
+            if (!container) return;
+            if (!this.notifications || this.notifications.length === 0) {
+                container.innerHTML = '<p class="text-muted">لا توجد إشعارات مرسلة</p>';
+                return;
+            }
+            const html = this.notifications.map(n => {
+                const time = new Date(n.timestamp || Date.now());
+                return `<div class="mb-2" style="border-bottom:1px solid rgba(255,255,255,0.04);padding-bottom:10px;">
+                    ${n.image ? `<img src="${n.image}" style="width:100%;max-height:160px;object-fit:cover;border-radius:6px;margin-bottom:8px;">` : ''}
+                    <strong>${this.escapeHtml(n.title)}</strong>
+                    <p style="margin:6px 0;">${this.escapeHtml(n.message)}</p>
+                    ${n.link ? `<a href="${n.link}" target="_blank" style="color:#9dd1ff">${n.link}</a>` : ''}
+                    <div class="text-muted" style="font-size:12px;margin-top:6px;">${time.toLocaleString()}</div>
+                </div>`;
+            }).join('');
+            container.innerHTML = html;
+        }
+
+        escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; });
+        }
+
+        // ---------- إرسال إشعار ----------
+        async handleSendNotify(e) {
+            e.preventDefault();
+            const title = document.getElementById('notifyTitle').value.trim();
+            const message = document.getElementById('notifyMessage').value.trim();
+            const image = document.getElementById('notifyImage').value.trim();
+            const link = document.getElementById('notifyLink').value.trim();
+
+            if (!title || !message) {
+                alert('الرجاء إدخال عنوان ونص الإشعار');
+                return;
+            }
+
+            const data = {
+                title, message, image: image || null, link: link || null,
+                timestamp: Date.now()
+            };
+
+            try {
+                if (this.firebaseAvailable) {
+                    await db.collection('notifications').add(data);
+                }
+
+                // خزّن محليًا أيضًا
+                const existing = JSON.parse(localStorage.getItem('app_notifications') || '[]');
+                existing.unshift(data);
+                // نحتفظ بحد أعلى عناصر محلياً (مثلاً 200)
+                localStorage.setItem('app_notifications', JSON.stringify(existing.slice(0, 200)));
+
+                // تحديث المصفوفة والواجهة
+                this.notifications.unshift(data);
+                this.renderSentNotifications();
+
+                alert('تم إرسال الإشعار بنجاح');
+                document.getElementById('notifyForm').reset();
+                document.getElementById('notifyPreview').style.display = 'none';
+            } catch (err) {
+                console.error('send notify err', err);
+                alert('خطأ في إرسال الإشعار: ' + (err.message || err));
+            }
+        }
+
+        handlePreviewNotify(e) {
+            e.preventDefault();
+            const title = document.getElementById('notifyTitle').value.trim();
+            const message = document.getElementById('notifyMessage').value.trim();
+            const image = document.getElementById('notifyImage').value.trim();
+            const link = document.getElementById('notifyLink').value.trim();
+
+            if (!title && !message && !image) {
+                alert('أدخل عنواناً أو نصاً أو صورة للمعاينة');
+                return;
+            }
+
+            document.getElementById('notifyPreview').style.display = 'block';
+            document.getElementById('notifyPreviewTitle').textContent = title || '';
+            document.getElementById('notifyPreviewMsg').textContent = message || '';
+            if (image) {
+                document.getElementById('notifyPreviewImg').src = image;
+                document.getElementById('notifyPreviewImg').style.display = 'block';
+            } else {
+                document.getElementById('notifyPreviewImg').style.display = 'none';
+            }
+            if (link) {
+                document.getElementById('notifyPreviewLink').href = link;
+                document.getElementById('notifyPreviewLink').style.display = 'inline-block';
+            } else {
+                document.getElementById('notifyPreviewLink').style.display = 'none';
+            }
+        }
+
+        async retryFirebaseConnection() {
+            this.setFirebaseStatus('جارٍ إعادة الفحص...', 'warning');
+            await this.checkFirebase();
+            await this.loadData();
+        }
+
+        logout() {
+            localStorage.removeItem('adminAuth');
+            localStorage.removeItem('adminEmail');
+            window.location.href = 'index.html';
+        }
+    }
+
+    // تهيئة المدير عند تحميل الصفحة
+    document.addEventListener('DOMContentLoaded', () => {
+        window.adminManager = new AdminManager();
+    });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
