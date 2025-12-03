@@ -1,153 +1,276 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>فتح لوحة الحكم</title>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>أقسام قنوات BEIN SPORT - Aseel TV</title>
 
-    <!-- خطوط وأيقونات -->
     <link rel="stylesheet" href="https://unicons.iconscout.com/release/v4.0.0/css/line.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
 
     <style>
-        body {
-            background: linear-gradient(135deg, #1d133d, #2e244f, #1d133d);
-            font-family: 'Tahoma', sans-serif;
+        /* تخصيصات سريعة لمظهر الإشعارات */
+        .notify-wrapper { position: absolute; top: 12px; left: 12px; z-index: 1000; display:flex; align-items:center; gap:12px; }
+        .notify-icon {
+            position: relative;
+            font-size: 26px;
             color: white;
-            height: 100vh;
-            overflow: hidden;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+        .notify-count {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #ff3b3b;
+            color: white;
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
         }
 
-        .center-box {
-            max-width: 450px;
-            background: rgba(0, 0, 0, 0.45);
-            padding: 30px;
-            border-radius: 15px;
+        /* صندوق الإشعارات */
+        .notify-box {
+            position: fixed;
+            top: 60px;
+            left: 12px;
+            width: 340px;
+            max-height: 420px;
+            overflow-y: auto;
+            background: linear-gradient(180deg,#21173a,#1a1330);
             border: 2px solid #654FD4;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-            margin: 120px auto 0 auto;
+            border-radius: 12px;
+            padding: 12px;
+            display: none;
+            z-index: 9999;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
         }
+        .notify-item {
+            background: rgba(255,255,255,0.03);
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 10px;
+            color: white;
+            transition: transform .15s;
+        }
+        .notify-item:hover { transform: translateY(-3px); }
+        .notify-item img { width:100%; max-height:140px; object-fit:cover; border-radius:8px; margin-bottom:8px;}
+        .notify-item h6 { margin:0 0 6px 0; font-weight:700;}
+        .notify-item p { margin:0 0 8px 0; color: #ddd; font-size:14px; }
+        .notify-item small { color:#9aa0b4; display:block; margin-top:6px; }
 
-        .btn-main {
-            background: linear-gradient(135deg, #654FD4, #503CA2);
-            border: none;
-            font-size: 18px;
+        /* النوافذ المنبثقة popup */
+        .popup-notify {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 320px;
+            background: linear-gradient(180deg,#22183a,#1b1330);
+            border: 2px solid #654FD4;
+            color: white;
             padding: 12px;
             border-radius: 10px;
-            width: 100%;
-            color: white;
-            transition: 0.3s;
+            z-index: 10000;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.6);
         }
-
-        .btn-main:hover {
-            background: linear-gradient(135deg, #503CA2, #654FD4);
-        }
-
-        .modal-content {
-            background: #21193f;
-            color: white;
-            border: 2px solid #654FD4;
-        }
-
-        .form-control {
-            background: rgba(255, 255, 255, 0.10);
-            border: 1px solid #654FD4;
-            color: white;
-        }
-
-        .form-control:focus {
-            background: rgba(255,255,255,0.17);
-            border-color: #8b74ff;
-            box-shadow: 0 0 5px rgba(101,79,212,0.4);
-        }
-
-        .close-btn {
-            background: #b40000;
-            color: white;
-            border: none;
-            padding: 10px;
-            width: 100%;
-            border-radius: 8px;
-        }
-
-        .title {
-            font-size: 24px;
-            text-align: center;
-            margin-bottom: 20px;
-            text-shadow: 0 3px 6px rgba(0,0,0,0.5);
-        }
+        .popup-notify img { width:100%; max-height:160px; object-fit:cover; border-radius:8px; margin-bottom:8px;}
+        .popup-close { background:transparent; border:none; color:#ccc; font-size:18px; cursor:pointer; }
     </style>
 </head>
 <body>
+    <header style="position:relative; padding:18px 12px; background:linear-gradient(90deg,#20173a,#2b1d4a);">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <a href="index.html" class="text-box" style="color:white; font-size:18px; text-decoration:none;">أقسام BEIN SPORT</a>
+            </div>
 
-    <!-- الصندوق الأساسي -->
-    <div class="center-box text-center">
-        <h2 class="title"><i class="uil uil-shield"></i> بوابة الدخول للوحة الحكم</h2>
-        <p>اضغط على الزر بالأسفل لفتح لوحة الحكم</p>
-
-        <button id="openAdminPanel" class="btn-main mt-3">
-            <i class="uil uil-lock"></i> فتح لوحة الحكم
-        </button>
-    </div>
-
-    <!-- نافذة تسجيل الدخول -->
-    <div class="modal fade" id="loginModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content p-3">
-                <div class="modal-body">
-                    <h4 class="text-center mb-3">تسجيل الدخول للإدارة</h4>
-
-                    <input type="email" id="adminEmail" class="form-control mb-3" placeholder="البريد الإلكتروني">
-                    <input type="password" id="adminPassword" class="form-control mb-3" placeholder="كلمة المرور">
-
-                    <div id="loginError" class="text-danger text-center mb-2" style="display:none;">
-                        ❌ بريد أو كلمة مرور غير صحيحة
-                    </div>
-
-                    <button id="loginButton" class="btn-main mb-2">دخول</button>
-                    <button class="close-btn" data-bs-dismiss="modal">إلغاء</button>
-                </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <!-- زر او رابط للدخول للإدارة -->
+                <a href="admin-gate.html" class="btn btn-outline-light">لوحة الحكم</a>
             </div>
         </div>
-    </div>
 
-    <!-- سكربتات -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+        <!-- أيقونة الإشعارات وصندوق -->
+        <div class="notify-wrapper">
+            <div id="notifyIcon" class="notify-icon" title="الإشعارات">
+                <i class="uil uil-bell"></i>
+                <span id="notifyCount" class="notify-count" style="display:none">0</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="content container">
+        <h1 class="page-title">أقسام القنوات المتاحة</h1>
+        <div class="welcome-message">اختر أحد الأقسام أدناه لعرض القنوات المتاحة فيه.</div>
+        <div id="sectionsContainer" class="sections-container row gy-3"></div>
+    </main>
+
+    <!-- صندوق الإشعارات -->
+    <div id="notificationsBox" class="notify-box"></div>
+
+    <!-- حاوية Popup notifications -->
+    <div id="popupContainer"></div>
+
+    <footer class="footer text-center py-3" style="background:#0f0b1a; color:#9aa0b4;">
+        <p>جميع الحقوق محفوظة &copy; <span id="currentYear"></span> Aseel TV</p>
+    </footer>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+
+    <!-- ملف إعداد Firebase -->
+    <script src="js/firebase-config.js"></script>
+
+    <!-- السكربت الأساسي للموقع (إن وُجد) -->
+    <script src="js/app.js"></script>
 
     <script>
-        // بيانات تسجيل الدخول الصحيحة
-        const trueEmail = "admin@gmail.com";     // غيرها كما تريد
-        const truePass  = "123456";              // كلمة المرور
+    // ----------------------------
+    // Notifications logic for index
+    // ----------------------------
+    (function(){
+        const notifyIcon = document.getElementById('notifyIcon');
+        const notifyCountEl = document.getElementById('notifyCount');
+        const notificationsBox = document.getElementById('notificationsBox');
+        const popupContainer = document.getElementById('popupContainer');
 
-        // عند الضغط على زر "فتح لوحة الحكم"
-        document.getElementById("openAdminPanel").addEventListener("click", function () {
-            const isLogged = localStorage.getItem("adminAuth");
-            const email = localStorage.getItem("adminEmail");
+        const LOCAL_KEY = 'app_notifications';
+        const LAST_SEEN_KEY = 'app_notifications_last_seen'; // تخزين آخر وقت عرض popup
 
-            if (isLogged === "true" && email) {
-                window.location.href = "admin.html";   // فتح اللوحة مباشرة
-            } else {
-                let loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
-                loginModal.show();
+        // جلب الإشعارات من Firestore أو LocalStorage
+        async function fetchNotifications() {
+            let list = [];
+            // حاول أولاً من Firestore
+            try {
+                if (typeof firebase !== 'undefined' && typeof db !== 'undefined') {
+                    const snap = await db.collection('notifications').orderBy('timestamp','desc').limit(200).get();
+                    list = snap.docs.map(d => d.data());
+                } else {
+                    throw new Error('Firestore not available');
+                }
+            } catch (err) {
+                //Fallback: من التخزين المحلي
+                console.warn('Firestore unavailable, fallback to localStorage', err);
+                list = JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]');
             }
+
+            // احتفظ بالمصفوفة مرتبة نزولياً
+            list.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+            // فلتر آخر 3 أيام
+            const threeDays = 3 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            list = list.filter(n => (now - (n.timestamp || now)) <= threeDays);
+            return list;
+        }
+
+        // عرض العدد على الأيقونة وتهيئة صندوق الإشعارات
+        async function renderNotifications() {
+            const list = await fetchNotifications();
+
+            // عرض العدد (ألاقل من 100)
+            if (list.length > 0) {
+                notifyCountEl.style.display = 'inline-block';
+                notifyCountEl.textContent = list.length > 99 ? '99+' : String(list.length);
+            } else {
+                notifyCountEl.style.display = 'none';
+            }
+
+            // بناء HTML للصندوق
+            if (list.length === 0) {
+                notificationsBox.innerHTML = '<p class="text-muted" style="color:#c8c8c8">لا توجد إشعارات خلال آخر 3 أيام</p>';
+            } else {
+                notificationsBox.innerHTML = list.map(n => {
+                    const t = new Date(n.timestamp || Date.now()).toLocaleString();
+                    return `<div class="notify-item">
+                        ${n.image ? `<img src="${escapeHtml(n.image)}" alt="">` : ''}
+                        <h6>${escapeHtml(n.title || '')}</h6>
+                        <p>${escapeHtml(n.message || '')}</p>
+                        ${n.link ? `<a href="${escapeHtml(n.link)}" target="_blank" style="color:#9dd1ff">فتح الرابط</a>` : ''}
+                        <small>${t}</small>
+                    </div>`;
+                }).join('');
+            }
+
+            // انشاء popup لعرض أحدث إشعار لم يُعرض بعد
+            showNewestUnseenPopup(list);
+        }
+
+        // فتح/اغلاق صندوق الإشعارات عند الضغط على الأيقونة
+        notifyIcon.addEventListener('click', () => {
+            notificationsBox.style.display = (notificationsBox.style.display === 'block') ? 'none' : 'block';
         });
 
-        // عملية تسجيل الدخول
-        document.getElementById("loginButton").addEventListener("click", function () {
-            const email = document.getElementById("adminEmail").value.trim();
-            const pass  = document.getElementById("adminPassword").value.trim();
-
-            if (email === trueEmail && pass === truePass) {
-                // حفظ الجلسة
-                localStorage.setItem("adminAuth", "true");
-                localStorage.setItem("adminEmail", email);
-
-                window.location.href = "admin.html";  // الدخول للوحة الحكم
-            } else {
-                document.getElementById("loginError").style.display = "block";
-            }
+        // ظهر لأول مرة: تحميل وتمرير
+        document.addEventListener('DOMContentLoaded', () => {
+            renderNotifications();
+            // إعادة التحديث كل دقيقتين لإظهار إشعارات جديدة (اختياري)
+            setInterval(renderNotifications, 120000);
         });
+
+        // عرض popup للإشعار الأحدث الذي لم يُعرض بعد
+        function showNewestUnseenPopup(list) {
+            if (!list || list.length === 0) return;
+
+            const lastSeen = parseInt(localStorage.getItem(LAST_SEEN_KEY) || '0', 10);
+            const newest = list[0];
+            const newestTime = newest.timestamp || 0;
+
+            // إذا كان الأحدث أحدث من آخر مشاهدة - اعرضه
+            if (newestTime > lastSeen) {
+                createPopup(newest);
+                // حدّث آخر مشاهدة بعد العرض
+                localStorage.setItem(LAST_SEEN_KEY, String(Date.now()));
+            }
+        }
+
+        // إنشاء نافذة منبثقة مؤقتة
+        function createPopup(n) {
+            // امسح أي Popup سابق
+            popupContainer.innerHTML = '';
+
+            const div = document.createElement('div');
+            div.className = 'popup-notify';
+            div.innerHTML = `
+                ${n.image ? `<img src="${escapeHtml(n.image)}" alt="">` : ''}
+                <h5 style="margin:0 0 6px 0;">${escapeHtml(n.title || '')}</h5>
+                <p style="margin:0 0 8px 0;">${escapeHtml(n.message || '')}</p>
+                ${n.link ? `<a href="${escapeHtml(n.link)}" target="_blank" style="color:#9dd1ff">فتح الرابط</a>` : ''}
+                <div style="text-align:left;margin-top:8px;">
+                    <button class="popup-close" title="إغلاق">✕</button>
+                </div>
+            `;
+
+            popupContainer.appendChild(div);
+
+            // إغلاق عند الضغط على الزر
+            div.querySelector('.popup-close').addEventListener('click', () => div.remove());
+
+            // اغلق تلقائياً بعد 6 ثواني
+            setTimeout(() => { if (div.parentNode) div.remove(); }, 6000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+    })();
     </script>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>document.getElementById('currentYear').textContent = new Date().getFullYear();</script>
 </body>
 </html>
