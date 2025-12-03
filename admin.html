@@ -230,18 +230,16 @@ service cloud.firestore {
                     return;
                 }
                 // اختبار بسيط للاتصال
-                const testRef = db.collection('__test_connection__').doc('_ping_');
-                await testRef.set({ ping: Date.now() });
-                await testRef.delete();
-
-                this.firebaseAvailable = true;
-                this.setFirebaseStatus('متصل بقاعدة البيانات', 'success');
-            } catch (err) {
-                console.error('firebase check err', err);
-                this.firebaseAvailable = false;
-                this.setFirebaseStatus('تعذر الاتصال بـ Firebase: ' + (err.message || err), 'error');
-            }
-        }
+                async function checkFirebaseConnection() {
+    try {
+        await db.collection("notifications").limit(1).get();
+        console.log("Firebase Connected ✔");
+        return true;
+    } catch (err) {
+        console.error("Firebase Error:", err);
+        return false;
+    }
+}
 
         setFirebaseStatus(msg, type) {
             const el = document.getElementById('firebaseStatus');
