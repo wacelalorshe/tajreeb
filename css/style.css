@@ -939,3 +939,56 @@
             color: #E1E1E1;
             font-size: 14px;
         }
+
+
+
+    .notify-icon {
+        position: absolute;
+        top: 15px;
+        left: 60px;
+        cursor: pointer;
+        font-size: 26px;
+        color: white;
+    }
+
+    .notify-count {
+        position: absolute;
+        top: -5px;
+        right: -10px;
+        background: red;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 50%;
+        font-size: 12px;
+    }
+
+    /* نافذة عرض الإشعارات */
+    .notify-box {
+        position: fixed;
+        top: 70px;
+        left: 10px;
+        width: 300px;
+        max-height: 420px;
+        overflow-y: auto;
+        background: #1b1733;
+        border: 2px solid #654FD4;
+        border-radius: 12px;
+        padding: 10px;
+        display: none;
+        z-index: 9999;
+    }
+
+    .notify-item {
+        background: rgba(255,255,255,0.08);
+        padding: 10px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        color: white;
+    }
+
+    .notify-item img {
+        width: 100%;
+        border-radius: 10px;
+        margin-bottom: 8px;
+    }
+</style>
